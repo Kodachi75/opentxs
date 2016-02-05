@@ -2798,7 +2798,7 @@ const String Nym::asPublicNym() const
 {
     serializedCredentialIndex credentials = SerializeCredentialIndex(Nym::FULL_CREDS);
 
-    OT_ASSERT(proto::Verify(credentials));
+    OT_ASSERT(proto::Check<proto::CredentialIndex>(credentials, 0, 0xFFFFFFFF));
 
     OTASCIIArmor armoredPublicNym(proto::ProtoAsData<proto::CredentialIndex>(credentials));
 
@@ -2979,7 +2979,7 @@ serializedCredentialIndex Nym::ExtractArmoredCredentialIndex(
 
 bool Nym::LoadCredentialIndex(const serializedCredentialIndex& index)
 {
-    if (!proto::Verify(index)) {
+    if (!proto::Check<proto::CredentialIndex>(index, 0, 0xFFFFFFFF)) {
         otErr << __FUNCTION__ << ": Unable to load invalid serialized"
                               << " credential index.\n";
         OT_ASSERT(false);

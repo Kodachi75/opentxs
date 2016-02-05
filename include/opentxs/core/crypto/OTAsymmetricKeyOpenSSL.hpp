@@ -95,8 +95,8 @@ private:
     OTAsymmetricKey_OpenSSL(const String& publicKey);
 
 public:
-    virtual CryptoAsymmetric& engine() const;
-    virtual bool IsEmpty() const;
+    CryptoAsymmetric& engine() const override;
+    bool IsEmpty() const override;
     // m_p_ascKey is the most basic value. m_pKey is derived from it, for
       // example.
     // Don't ever call this. It's only here because it's impossible to get rid of
@@ -119,16 +119,16 @@ public:
         const String* pstrReason = nullptr,
         const OTPassword* pImportPassword = nullptr) const;
 
-    virtual bool GetPublicKey(String& strKey) const;
+    bool GetPublicKey(String& strKey) const override;
     virtual bool SetPublicKey(const String& strKey);
 
-    virtual bool ReEncryptPrivateKey(const OTPassword& theExportPassword,
-                                     bool bImporting) const;
+    bool ReEncryptPrivateKey(const OTPassword& theExportPassword,
+                                     bool bImporting) const override;
 
     class OTAsymmetricKey_OpenSSLPrivdp;
     OTAsymmetricKey_OpenSSLPrivdp* dp;
 
-    virtual serializedAsymmetricKey Serialize() const;
+    serializedAsymmetricKey Serialize() const override;
     bool TransportKey(unsigned char* publicKey, unsigned char* privateKey) const override;
 
 protected: // CONSTRUCTOR
@@ -137,11 +137,11 @@ protected: // CONSTRUCTOR
 
 public: // DERSTRUCTION
     virtual ~OTAsymmetricKey_OpenSSL();
-    virtual void Release();
+    void Release() override;
     void Release_AsymmetricKey_OpenSSL();
 
 protected:
-    virtual void ReleaseKeyLowLevel_Hook() const;
+    void ReleaseKeyLowLevel_Hook() const override;
 };
 
 #elif defined(OT_CRYPTO_USING_GPG)

@@ -234,9 +234,14 @@ bool PaymentCode::Verify(const MasterCredential& credential) const
             Credential::AS_PUBLIC,
             Credential::WITHOUT_SIGNATURES);
 
-    if (!proto::Verify(*serializedMaster, proto::CREDROLE_MASTERKEY, false)) {
-        otErr << __FUNCTION__ << ": Invalid master credential syntax.\n";
-        return false;
+    if (!proto::Check<proto::Credential>(
+        *serializedMaster,
+        0,
+        0xFFFFFFFF,
+        proto::CREDROLE_MASTERKEY,
+        false)) {
+            otErr << __FUNCTION__ << ": Invalid master credential syntax.\n";
+            return false;
     }
 
     bool sameSource = (*this ==
@@ -336,7 +341,7 @@ void PaymentCode::ConstructKey(const OTData& pubkey, const OTData& chaincode)
 
 bool PaymentCode::VerifyInternally() const
 {
-    return(proto::Verify(*Serialize(), version_, version_));
+    return(proto::Check<proto::PaymentCode>(*Serialize(), version_, version_));
 }
 
 } // namespace opentxs

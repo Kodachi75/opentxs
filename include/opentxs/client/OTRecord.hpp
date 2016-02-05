@@ -112,6 +112,7 @@ private:
     bool m_bIsCheque;
     bool m_bIsInvoice;
     bool m_bIsCash;
+    bool m_bIsNotice;
     bool m_bIsExpired;
     bool m_bIsCanceled;
     OTRecordType m_RecordType;
@@ -132,6 +133,7 @@ public:
     EXPORT bool IsContract() const;
     EXPORT bool IsPaymentPlan() const;
     EXPORT bool IsCash() const;
+    EXPORT bool IsNotice() const;
     EXPORT bool HasContents() const;
     EXPORT bool HasMemo() const;
     EXPORT bool IsExpired() const;

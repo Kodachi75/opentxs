@@ -116,7 +116,9 @@ ServerContract* ServerContract::Create(
 ServerContract* ServerContract::Factory(
     const proto::ServerContract& serialized)
 {
-    if (!Verify(serialized)) { return nullptr; }
+    if (!proto::Check<proto::ServerContract>(serialized, 0, 0xFFFFFFFF)) {
+        return nullptr;
+    }
 
     ServerContract* contract = new ServerContract(serialized);
 
@@ -261,7 +263,7 @@ bool ServerContract::Validate() const
         validNym = nym_->VerifyPseudonym();
     }
     auto contract = Contract();
-    bool validSyntax = proto::Verify(contract);
+    bool validSyntax = proto::Check<proto::ServerContract>(contract, 0, 0xFFFFFFFF);
     bool validSig = false;
 
     if (nym_) {

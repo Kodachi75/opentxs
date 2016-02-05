@@ -75,6 +75,7 @@ const std::string Instrument_TypeStrings[] = {
     "smart contract", // An OTCronItem-derived OTSmartContract, related to a
                       // smart contract.
     "cash", // An Contract-derived OTPurse containing a list of cash OTTokens.
+    "agreement", // An OTTransaction::notice which could be a Payment Plan OR a Smart Contract.
     "ERROR_STATE"};
 
 const std::string& GetTypeString(int theType)
@@ -1269,9 +1270,7 @@ bool OTRecordList::Populate()
                                       // about.
             // strOutpayment contains the actual outgoing payment instrument.
             //
-            const std::string str_outpmt_server =
-                OTAPI_Wrap::GetNym_OutpaymentsNotaryIDByIndex(
-                    str_nym_id, nCurrentOutpayment);
+            const std::string str_outpmt_server = OTAPI_Wrap::GetNym_OutpaymentsNotaryIDByIndex(str_nym_id, nCurrentOutpayment);
             const std::string str_outpmt_recipientID = // Notice here, unlike the sender account id above (which is gleaned from the instrument itself)
                 OTAPI_Wrap::GetNym_OutpaymentsRecipientIDByIndex( // instead we get the recipient Nym ID from the outgoing message. This is good, because
                     str_nym_id, nCurrentOutpayment); // otherwise we'd have to check to see if it's a payment plan here, and get the "sender" (payer aka customer) NymID and set it here as the recipient! (Since the merchant "sends" the proposal in a message to the customer, who then "sends" the payments to the merchant acct.) See above comment about this.
@@ -1901,25 +1900,24 @@ bool OTRecordList::Populate()
                           "(Probably just doesn't exist yet.)\n";
             nIndex = (-1);
 
-            // Also loop through its record box. For this record box, pass the
-            // NYM_ID twice,
+            // Also loop through its record box. For this record box, pass the NYM_ID twice,
             // since it's the recordbox for the Nym.
             // OPTIMIZE FYI: m_bRunFast impacts run speed here.
-            Ledger* pRecordbox =
-                m_bRunFast
-                    ? OTAPI_Wrap::OTAPI()->LoadRecordBoxNoVerify(
-                          theNotaryID, theNymID, theNymID)
-                    : // twice.
-                    OTAPI_Wrap::OTAPI()->LoadRecordBox(theNotaryID, theNymID,
-                                                       theNymID);
+            Ledger* pRecordbox = m_bRunFast
+                    ? OTAPI_Wrap::OTAPI()->LoadRecordBoxNoVerify(theNotaryID, theNymID, theNymID) // twice.
+                    :
+                    OTAPI_Wrap::OTAPI()->LoadRecordBox(theNotaryID, theNymID, theNymID);
             std::unique_ptr<Ledger> theRecordBoxAngel(pRecordbox);
 
             // It loaded up, so let's loop through it.
-            if (nullptr != pRecordbox) {
-                for (auto& it : pRecordbox->GetTransactionMap()) {
+            if (nullptr != pRecordbox)
+            {
+                for (auto& it : pRecordbox->GetTransactionMap())
+                {
                     OTTransaction* pBoxTrans = it.second;
                     OT_ASSERT(nullptr != pBoxTrans);
                     bool bOutgoing = false;
+                    
                     // Let's say Alice sends a payment plan to Bob, and then Bob
                     // activates it. Alice will receive a notice, via her Nymbox,
                     // which will be placed in her Nym record box. (The pending outgoing
@@ -1928,93 +1926,85 @@ bool OTRecordList::Populate()
                     // notice in her record box relates to her SENT plan, not a received
                     // plan. It needs to show up as outgoing/sent, NOT incoming/received.
                     //
-                    if (OTTransaction::notice == pBoxTrans->GetType())
-                        bOutgoing = true;
+                    // UPDATE: The above is true, but not in the case of Bob! He had a "pending"
+                    // in his inbox, so that needs to become an "activated" in his inbox! (Not outbox.)
+                    //
+//                  if (OTTransaction::notice == pBoxTrans->GetType())
+//                      bOutgoing = true;
                     ++nIndex; // 0 on first iteration.
                     otInfo << __FUNCTION__
                           << ": Payment RECORD index: " << nIndex << "\n";
                     std::string str_name; // name of sender OR recipient
-                                          // (depending on whether it was
-                                          // originally incoming or outgoing.)
+                                          // (depending on whether it was originally incoming or outgoing.)
                     std::string str_other_nym_id;
                     std::string str_other_acct_id;
 
-                    if (!pBoxTrans->IsAbbreviated()) {
+                    if (!pBoxTrans->IsAbbreviated())
+                    {
                         Identifier theSenderID, theSenderAcctID;
                         Identifier theRecipientID, theRecipientAcctID;
 
-                        if (pBoxTrans->GetSenderNymIDForDisplay(theSenderID)) {
+                        if (pBoxTrans->GetSenderNymIDForDisplay(theSenderID))
+                        {
                             const String strSenderID(theSenderID);
                             const std::string str_sender_id(strSenderID.Get());
 
-                            // Usually, Nym is the RECIPIENT. Sometimes he's the
-                            // sender.
-                            // Either way, we want the OTHER ID (the other Nym)
-                            // for display.
-                            // So here, if Nym's CLEARLY the sender, then we
-                            // want the RECIPIENT.
-                            // Whereas if Nym were the recipient, then we'd want
-                            // the SENDER. (For display.)
+                            // Usually, Nym is the RECIPIENT. Sometimes he's the sender.
+                            // Either way, we want the OTHER ID (the other Nym) for display.
+                            // So here, if Nym's CLEARLY the sender, then we want the RECIPIENT.
+                            // Whereas if Nym were the recipient, then we'd want the SENDER. (For display.)
                             //
-                            if (0 == str_nym_id.compare(str_sender_id)) // str_nym_id IS str_sender_id.
-                                                                        // (Therefore we want recipient.)
+                            if (0 == str_nym_id.compare(str_sender_id)) // str_nym_id IS str_sender_id. (Therefore we want recipient.)
                             {
-                                bOutgoing = true; // if Nym is the sender, then
-                                                  // it must have been outgoing.
+                                if (OTTransaction::notice == pBoxTrans->GetType())
+                                    bOutgoing = false; // Payment Plan "sender" of funds (payer) is the recipient of the plan.
+                                else
+                                    bOutgoing = true; // if Nym is the sender, then it must have been outgoing.
 
-                                if (pBoxTrans->GetRecipientNymIDForDisplay(
-                                        theRecipientID)) {
+                                if (pBoxTrans->GetRecipientNymIDForDisplay(theRecipientID))
+                                {
                                     const String strRecipientID(theRecipientID);
-                                    const std::string str_recipient_id(
-                                        strRecipientID.Get());
+                                    const std::string str_recipient_id(strRecipientID.Get());
 
-                                    String strName(m_pLookup->GetNymName(
-                                        str_recipient_id, it_server)),
-                                        strNameTemp;
+                                    String strName(m_pLookup->GetNymName(str_recipient_id, it_server)), strNameTemp;
 
                                     if (strName.Exists())
-                                        strNameTemp.Format(
-                                            OTRecordList::textTo(),
-                                            strName.Get());
+                                        strNameTemp.Format(OTRecordList::textTo(), strName.Get());
                                     else
-                                        strNameTemp.Format(
-                                            OTRecordList::textTo(),
-                                            str_recipient_id.c_str());
+                                        strNameTemp.Format(OTRecordList::textTo(), str_recipient_id.c_str());
 
                                     str_name = strNameTemp.Get();
                                     str_other_nym_id = str_recipient_id;
-                                    if (pBoxTrans->GetRecipientAcctIDForDisplay(
-                                            theRecipientAcctID)) {
-                                        const String strRecipientAcctID(
-                                            theRecipientAcctID);
-                                        str_other_acct_id =
-                                            strRecipientAcctID.Get();
+                                    
+                                    if (pBoxTrans->GetRecipientAcctIDForDisplay(theRecipientAcctID))
+                                    {
+                                        const String strRecipientAcctID(theRecipientAcctID);
+                                        str_other_acct_id = strRecipientAcctID.Get();
                                     }
                                 }
                             }
-                            else // str_nym_id IS NOT str_sender_id.
-                                   // (Therefore we want sender.)
-                            { // In this case, some OTHER Nym is the sender, so
-                                // it must have been incoming. (And bOutgoing is
-                                // already false.)
+                            else // str_nym_id IS NOT str_sender_id. (Therefore we want sender.)
+                            {    // In this case, some OTHER Nym is the sender, so it must have been incoming.
+                                 // (And bOutgoing is already false.)
+                                
+                                if (OTTransaction::notice == pBoxTrans->GetType())
+                                    bOutgoing = true; // Payment Plan "recipient" of funds (merchant) is the sender of the plan.
+                                else
+                                    bOutgoing = false;
 
-                                String strName(m_pLookup->GetNymName(
-                                    str_sender_id, it_server)),
-                                    strNameTemp;
+                                String strName(m_pLookup->GetNymName(str_sender_id, it_server)), strNameTemp;
 
                                 if (strName.Exists())
-                                    strNameTemp.Format(OTRecordList::textFrom(),
-                                                       strName.Get());
+                                    strNameTemp.Format(OTRecordList::textFrom(), strName.Get());
                                 else
-                                    strNameTemp.Format(OTRecordList::textFrom(),
-                                                       str_sender_id.c_str());
+                                    strNameTemp.Format(OTRecordList::textFrom(), str_sender_id.c_str());
 
                                 str_name = strNameTemp.Get();
                                 str_other_nym_id = str_sender_id;
-                                if (pBoxTrans->GetSenderAcctIDForDisplay(
-                                        theSenderAcctID)) {
-                                    const String strSenderAcctID(
-                                        theSenderAcctID);
+                                
+                                if (pBoxTrans->GetSenderAcctIDForDisplay(theSenderAcctID))
+                                {
+                                    const String strSenderAcctID(theSenderAcctID);
                                     str_other_acct_id = strSenderAcctID.Get();
                                 }
                             }
@@ -2022,68 +2012,53 @@ bool OTRecordList::Populate()
                         // In this block below, we already KNOW
                         // GetSenderNymIDForDisplay is EMPTY.
                         // (So it's "recipient or bust.")
-                        else if (pBoxTrans->GetRecipientNymIDForDisplay(
-                                     theRecipientID)) {
+                        else if (pBoxTrans->GetRecipientNymIDForDisplay(theRecipientID))
+                        {
                             const String strRecipientID(theRecipientID);
-                            const std::string str_recipient_id(
-                                strRecipientID.Get());
+                            const std::string str_recipient_id(strRecipientID.Get());
 
-                            if (0 !=
-                                str_nym_id.compare(
-                                    str_recipient_id)) // str_nym_id is NOT
-                                                       // str_recipient_id.
-                                                       // (Therefore we want
-                                                       // str_recipient_id.)
+                            if (0 != str_nym_id.compare(str_recipient_id)) // str_nym_id is NOT str_recipient_id. (Therefore we want str_recipient_id.)
                             {
-                                // If Nym is not the recipient, then he must be
-                                // the sender.
+                                // If Nym is not the recipient, then he must be the sender.
                                 // (Therefore it must be outgoing.)
-                                bOutgoing = true;
+                                //
+                                if (OTTransaction::notice == pBoxTrans->GetType())
+                                    bOutgoing = false; // Payment Plan "sender" of funds (payer) is the recipient of the plan.
+                                else
+                                    bOutgoing = true; // if Nym is the sender, then it must have been outgoing.
 
-                                String strName(m_pLookup->GetNymName(
-                                    str_recipient_id, it_server)),
-                                    strNameTemp;
+                                String strName(m_pLookup->GetNymName(str_recipient_id, it_server)), strNameTemp;
 
                                 if (strName.Exists())
-                                    strNameTemp.Format(OTRecordList::textTo(),
-                                                       strName.Get());
+                                    strNameTemp.Format(OTRecordList::textTo(), strName.Get());
                                 else
-                                    strNameTemp.Format(
-                                        OTRecordList::textTo(),
-                                        str_recipient_id.c_str());
+                                    strNameTemp.Format(OTRecordList::textTo(), str_recipient_id.c_str());
 
                                 str_name = strNameTemp.Get();
                                 str_other_nym_id = str_recipient_id;
-                                if (pBoxTrans->GetRecipientAcctIDForDisplay(
-                                        theRecipientAcctID)) {
-                                    const String strRecipientAcctID(
-                                        theRecipientAcctID);
-                                    str_other_acct_id =
-                                        strRecipientAcctID.Get();
+                                if (pBoxTrans->GetRecipientAcctIDForDisplay(theRecipientAcctID))
+                                {
+                                    const String strRecipientAcctID(theRecipientAcctID);
+                                    str_other_acct_id = strRecipientAcctID.Get();
                                 }
                             }
                         }
                     } // if not abbreviated.
                     time64_t tValidFrom = OT_TIME_ZERO, tValidTo = OT_TIME_ZERO;
-                    std::string str_date =
-                        "0"; // the "date signed" on the transaction receipt.
+                    std::string str_date = "0"; // the "date signed" on the transaction receipt.
                     time64_t tDateSigned = pBoxTrans->GetDateSigned();
 
-                    if (tDateSigned > OT_TIME_ZERO) {
+                    if (tDateSigned > OT_TIME_ZERO)
+                    {
                         tValidFrom = tDateSigned;
-                        const uint64_t lDateSigned =
-                            OTTimeGetSecondsFromTime(tDateSigned);
+                        const uint64_t lDateSigned = OTTimeGetSecondsFromTime(tDateSigned);
                         String strDateSigned;
                         strDateSigned.Format("%" PRIu64 "", lDateSigned);
                         str_date = strDateSigned.Get();
                     }
-                    const std::string* p_str_asset_type =
-                        &OTRecordList::s_blank; // <========== ASSET TYPE
-                    const std::string* p_str_asset_name =
-                        &OTRecordList::s_blank; // instrument definition display
-                                                // name.
-                    const std::string* p_str_account =
-                        &OTRecordList::s_blank; // <========== ACCOUNT
+                    const std::string* p_str_asset_type = &OTRecordList::s_blank; // <========== ASSET TYPE
+                    const std::string* p_str_asset_name = &OTRecordList::s_blank; // instrument definition display name.
+                    const std::string* p_str_account    = &OTRecordList::s_blank; // <========== ACCOUNT
                     std::string str_amount;     // <========== AMOUNT
                     std::string str_type;       // Instrument type.
                     std::string str_memo; // Instrument memo (if applicable.)
@@ -2092,36 +2067,30 @@ bool OTRecordList::Populate()
                     int64_t lPaymentInstrumentTransNum        = 0,
                             lPaymentInstrumentTransNumDisplay = 0;
                     
-                    if (pBoxTrans->IsAbbreviated()) {
-                        str_type =
-                            pBoxTrans->GetTypeString(); // instrumentNotice,
-                                                        // etc.
+                    if (pBoxTrans->IsAbbreviated())
+                    {
+                        str_type = pBoxTrans->GetTypeString(); // instrumentNotice, etc.
                         int64_t lAmount = pBoxTrans->GetAbbrevDisplayAmount();
 
-                        if (0 != lAmount) {
+                        if (0 != lAmount)
+                        {
                             String strTemp;
                             strTemp.Format("%" PRId64 "", lAmount);
                             str_amount = strTemp.Get();
                         }
                     }
-                    else // NOT abbreviated. (Full box receipt is already
-                           // loaded.)
+                    else // NOT abbreviated. (Full box receipt is already loaded.)
                     {
-                        OTPayment* pPayment = GetInstrument(
-                            *pNym, nIndex,
-                            *pRecordbox); // ===> Returns financial instrument
-                                          // by index.
+                        OTPayment* pPayment = GetInstrument(*pNym, nIndex, *pRecordbox); // ===> Returns financial instrument by index.
                         std::unique_ptr<OTPayment> thePaymentAngel(pPayment);
-                        if (nullptr ==
-                            pPayment) // then we treat it like it's abbreviated.
+                        
+                        if (nullptr == pPayment) // then we treat it like it's abbreviated.
                         {
-                            str_type =
-                                pBoxTrans->GetTypeString(); // instrumentNotice,
-                                                            // etc.
-                            int64_t lAmount =
-                                pBoxTrans->GetAbbrevDisplayAmount();
+                            str_type = pBoxTrans->GetTypeString(); // instrumentNotice, etc.
+                            int64_t lAmount = pBoxTrans->GetAbbrevDisplayAmount();
 
-                            if (0 != lAmount) {
+                            if (0 != lAmount)
+                            {
                                 String strTemp;
                                 strTemp.Format("%" PRId64 "", lAmount);
                                 str_amount = strTemp.Get();
@@ -2129,8 +2098,8 @@ bool OTRecordList::Populate()
                         }
                         // We have pPayment, the instrument accompanying the
                         // receipt in the payments recordbox.
-                        else if (pPayment->SetTempValues()) {
-                            
+                        else if (pPayment->SetTempValues())
+                        {
                             int64_t lOpeningNum = 0;
                             if (pPayment->GetOpeningNum(lOpeningNum, theNymID))
                                 lPaymentInstrumentTransNum = lOpeningNum;
@@ -2145,9 +2114,9 @@ bool OTRecordList::Populate()
                             pPayment->GetValidFrom(tValidFrom);
                             pPayment->GetValidTo(tValidTo);
 
-                            if (tValidFrom > OT_TIME_ZERO) {
-                                const uint64_t lFrom =
-                                    OTTimeGetSecondsFromTime(tValidFrom);
+                            if (tValidFrom > OT_TIME_ZERO)
+                            {
+                                const uint64_t lFrom = OTTimeGetSecondsFromTime(tValidFrom);
                                 String strFrom;
                                 strFrom.Format("%" PRIu64 "", lFrom);
                                 str_date = strFrom.Get();
@@ -2157,9 +2126,10 @@ bool OTRecordList::Populate()
 
                             if (bOutgoing) // Nym is sender.
                             {
-                                if ( (pPayment->IsPaymentPlan() && pPayment->GetRecipientAcctID(theAccountID)) ||
-                                    pPayment->GetSenderAcctIDForDisplay( theAccountID)) // Since Nym is ME, the Account must be MY acct.
+                                if ( ( (pPayment->IsPaymentPlan() || pPayment->IsNotice()) && pPayment->GetRecipientAcctID(theAccountID)) ||
+                                      pPayment->GetSenderAcctIDForDisplay(theAccountID)) // Since Nym is ME, the Account must be MY acct.
                                 { // (If this record was originally OUTgoing, then the SENDER's account is MY acct.)
+                                    //
                                     // UPDATE: Unless I sent a payment plan proposal. In which case I, the merchant,
                                     // am the "sender" of the proposal, but the "sender" on the instrument is the customer,
                                     // since he will be "sending" me the money! So the "Recipient" of the proposal message
@@ -2168,32 +2138,19 @@ bool OTRecordList::Populate()
                                     // start to arrive.) Thus, though the merchant is the "sender" of the proposal, he's the
                                     // "recipient" on the instrument.
                                     String strTemp(theAccountID);
-                                    std::string str_outpmt_account =
-                                        strTemp.Get(); // The accountID we found
-                                                       // on the payment (only
-                                                       // applies to outgoing
-                                                       // payments.)
-                                    auto it_acct = std::find(
-                                        m_accounts.begin(), m_accounts.end(),
-                                        str_outpmt_account);
-                                    if (it_acct !=
-                                        m_accounts.end()) // Found it on the
-                                                          // list of accounts we
-                                                          // care about.
+                                    std::string str_outpmt_account = strTemp.Get(); // The accountID we found on the payment (only applies to outgoing payments.)
+                                    auto it_acct = std::find(m_accounts.begin(), m_accounts.end(), str_outpmt_account);
+                                    if (it_acct != m_accounts.end()) // Found it on the list of accounts we care about.
                                     {
                                         p_str_account = &(*it_acct);
                                     }
-                                    else {
-                                        // There was definitely an account on
-                                        // the instrument, and it definitely
-                                        // did not match any of the accounts
-                                        // that we care about.
-                                        // Therefore, skip.
+                                    else
+                                    {
+                                        // There was definitely an account on the instrument, and it definitely
+                                        // did not match any of the accounts that we care about. Therefore, skip.
                                         //
                                         otInfo << __FUNCTION__
-                                              << ": Skipping 'sent payment' "
-                                                 "record. (We don't care about "
-                                                 "account "
+                                              << ": Skipping 'sent payment' record. (We don't care about account "
                                               << str_outpmt_account.c_str()
                                               << ")\n";
                                         continue;
@@ -2202,111 +2159,70 @@ bool OTRecordList::Populate()
                             }
                             else // Nym is recipient.
                             {
-                                // Why is this here? Because if Nym is
-                                // recipient, let's say he received an
-                                // instrumentNotice containing
-                                // a sendNymInstrument message containing an
-                                // incoming cheque. Well... that incoming cheque
-                                // (the payload
-                                // on sendNymInstrument message) is ENCRYPTED.
-                                // Meaning the above calls to
-                                // pBoxReceipt->GetSenderAcctID
-                                // on the instrumentNotice transaction will
-                                // FAIL. One option is to pass pNym into
-                                // GetSenderAcctID so it
-                                // can decrypt the payload and return the value.
-                                // But since we already have the payload
-                                // decrypted here
-                                // (we already have the cheque loaded up here)
-                                // we can just grab the senderAcctID directly
-                                // from the cheque.
-                                // That's why this is here -- because this is
-                                // where we KNOW we have the account ID -- so we
-                                // grab it.
+                                // Why is this here? Because if Nym is recipient, let's say he received
+                                // an instrumentNotice containing a sendNymInstrument message containing
+                                // an incoming cheque. Well... that incoming cheque (the payload on
+                                // sendNymInstrument message) is ENCRYPTED. Meaning the above calls to
+                                // pBoxReceipt->GetSenderAcctID on the instrumentNotice transaction will
+                                // FAIL. One option is to pass pNym into GetSenderAcctID so it can
+                                // decrypt the payload and return the value. But since we already have
+                                // the payload decrypted here (we already have the cheque loaded up
+                                // here) we can just grab the senderAcctID directly from the cheque.
+                                // That's why this is here -- because this is where we KNOW we have the
+                                // account ID -- so we grab it.
                                 //
                                 if (str_other_acct_id.empty() &&
-                                    (pPayment->GetSenderAcctIDForDisplay(
-                                        theAccountID))) {
+                                    ( ( (pPayment->IsPaymentPlan() || pPayment->IsNotice()) && pPayment->GetRecipientAcctID(theAccountID)) ||
+                                      pPayment->GetSenderAcctIDForDisplay(theAccountID))
+                                    )
+                                {
                                     String strTemp(theAccountID);
                                     str_other_acct_id = strTemp.Get();
                                 }
                             }
                             // By this point, p_str_account is definitely set.
-                            OT_ASSERT(nullptr !=
-                                      p_str_account); // and it's either
-                                                      // blank, or it's
-                                                      // one of the
-                                                      // accounts we
-                                                      // care about.
+                            OT_ASSERT(nullptr != p_str_account); // and it's either blank, or it's one of the accounts we care about.
                             Identifier theInstrumentDefinitionID;
 
-                            if (pPayment->GetInstrumentDefinitionID(
-                                    theInstrumentDefinitionID)) {
+                            if (pPayment->GetInstrumentDefinitionID(theInstrumentDefinitionID))
+                            {
                                 String strTemp(theInstrumentDefinitionID);
-                                const std::string str_inpmt_asset(
-                                    strTemp.Get()); // The instrument definition
-                                                    // we found
-                                                    // on the payment (if we
-                                                    // found anything.)
+                                const std::string str_inpmt_asset(strTemp.Get()); // The instrument definition we found on the payment (if we found anything.)
                                 auto it_asset = m_assets.find(str_inpmt_asset);
-                                if (it_asset != m_assets.end()) // Found it on
-                                                                // the map of
-                                // instrument definitions
-                                // we care
-                                // about.
+                                if (it_asset != m_assets.end()) // Found it on the map of instrument definitions we care about.
                                 {
-                                    p_str_asset_type =
-                                        &(it_asset->first); // Set the asset
-                                                            // type ID.
-                                    p_str_asset_name =
-                                        &(it_asset->second); // The CurrencyTLA.
-                                                             // Examples: USD,
-                                                             // BTC, etc.
+                                    p_str_asset_type = &(it_asset->first); // Set the asset type ID.
+                                    p_str_asset_name = &(it_asset->second); // The CurrencyTLA. Examples: USD, BTC, etc.
                                 }
-                                else {
-                                    // There was definitely an instrument
-                                    // definition on the
-                                    // instrument, and it definitely
-                                    // did not match any of the assets that we
-                                    // care about.
-                                    // Therefore, skip.
+                                else
+                                {
+                                    // There was definitely an instrument definition on the instrument, and it definitely
+                                    // did not match any of the assets that we care about. Therefore, skip.
                                     //
                                     otErr << __FUNCTION__
-                                          << ": Skipping: Payment record (we "
-                                             "don't care about instrument "
-                                             "definition "
+                                          << ": Skipping: Payment record (we don't care about instrument definition "
                                           << str_inpmt_asset.c_str() << ")\n";
                                     continue;
                                 }
                             }
                             // By this point, p_str_asset_type and
                             // p_str_asset_name are definitely set.
-                            OT_ASSERT(nullptr != p_str_asset_type); // and it's
-                                                                    // either
-                                                                    // blank, or
-                            // it's one of
-                            // the asset
-                            // types we
-                            // care about.
-                            OT_ASSERT(nullptr != p_str_asset_name); // and it's
-                                                                    // either
-                                                                    // blank, or
-                            // it's one of
-                            // the asset
-                            // types we
-                            // care about.
+                            OT_ASSERT(nullptr != p_str_asset_type); // and it's either blank, or it's one of the asset types we care about.
+                            OT_ASSERT(nullptr != p_str_asset_name); // and it's either blank, or it's one of the asset types we care about.
+
                             String strMemo;
-                            if (pPayment->GetMemo(strMemo)) {
+                            if (pPayment->GetMemo(strMemo))
+                            {
                                 str_memo = strMemo.Get();
                             }
                             // Instrument type (cheque, voucher, etc)
-                            int32_t nType =
-                                static_cast<int32_t>(pPayment->GetType());
+                            int32_t nType = static_cast<int32_t>(pPayment->GetType());
 
                             str_type = GetTypeString(nType);
                             int64_t lAmount = 0;
 
-                            if (pPayment->GetAmount(lAmount)) {
+                            if (pPayment->GetAmount(lAmount))
+                            {
                                 String strTemp;
                                 strTemp.Format("%" PRId64 "", lAmount);
                                 str_amount = strTemp.Get();
@@ -2314,30 +2230,24 @@ bool OTRecordList::Populate()
                         }
                     }
                     otInfo << __FUNCTION__ << ": ADDED: Payment record "
-                          << (bOutgoing ? "(sent)" : "(received)")
-                          << " (str_type: " << str_type.c_str() << ")\n";
+                           << (bOutgoing ? "(sent)" : "(received)")
+                           << " (str_type: " << str_type.c_str() << ")\n";
 
-                    shared_ptr_OTRecord sp_Record(new OTRecord(*this, 
+                    shared_ptr_OTRecord sp_Record(new OTRecord(*this,
                         it_server, *p_str_asset_type, *p_str_asset_name,
                         str_nym_id,     // This is the Nym WHOSE BOX IT IS.
-                        *p_str_account, // This is the Nym's account for this
-                                        // box. (Blank for incoming, set for
-                                        // outgoing.)
-                        // Everything above this line, it stores a reference to
-                        // an external string.
-                        // Everything below this line, it makes its own internal
-                        // copy of the string.
-                        str_name, // name of sender or recipient (since its in
-                                  // the recordbox.)
+                        *p_str_account, // This is the Nym's account for this box. (Blank for incoming, set for outgoing.)
+                        // Everything above this line, it stores a reference to an external string.
+                        // Everything below this line, it makes its own internal copy of the string.
+                        str_name, // name of sender or recipient (since its in the recordbox.)
                         str_date, // the "date signed" on the receipt.
                         str_amount, str_type, // pending, chequeReceipt, etc.
-                        false, // Everything in the recordbox is finished. (NOT
-                               // pending.)
-                        bOutgoing, // Since it's the recordbox, it contains both
-                                   // incoming and outgoing receipts.
+                        false, // Everything in the recordbox is finished. (NOT pending.)
+                        bOutgoing, // Since it's the recordbox, it contains both incoming and outgoing receipts.
                         true,      // IsRecord
                         false,     // IsReceipt,
                         OTRecord::Instrument));
+                    
                     if (strContents.Exists())
                         sp_Record->SetContents(strContents.Get());
                     sp_Record->SetDateRange(tValidFrom, tValidTo);
@@ -2352,11 +2262,10 @@ bool OTRecordList::Populate()
                         sp_Record->SetTransNumForDisplay(lPaymentInstrumentTransNumDisplay);
                     else
                         sp_Record->SetTransNumForDisplay(pBoxTrans->GetReferenceNumForDisplay());
-                    sp_Record->SetTransactionNum(
-                        pBoxTrans->GetTransactionNum());
+                    sp_Record->SetTransactionNum(pBoxTrans->GetTransactionNum());
 
-//                    otErr << "DEBUGGING! Added " << (bOutgoing ? "sent": "received") << " payment record: " <<
-//                    pBoxTrans->GetTypeString() <<
+//                    otErr << "DEBUGGING! RECORD LIST: Added " << (bOutgoing ? "sent": "received") << " payment record: " <<
+//                    pBoxTrans->GetTypeString() << "\n str_nym_id: " << str_nym_id << "\n str_other_nym_id: " << str_other_nym_id <<
 //                    "\n pBoxTrans->GetTransactionNum(): " << pBoxTrans->GetTransactionNum() <<
 //                    "\n pBoxTrans->GetReferenceNumForDisplay()" << pBoxTrans->GetReferenceNumForDisplay() << "\n";
                     
@@ -2366,8 +2275,7 @@ bool OTRecordList::Populate()
             }
             else
                 otWarn << __FUNCTION__
-                       << ": Failed loading payments record box. "
-                          "(Probably just doesn't exist yet.)\n";
+                       << ": Failed loading payments record box. (Probably just doesn't exist yet.)\n";
 
             // EXPIRED RECORDS:
             nIndex = (-1);
@@ -2376,18 +2284,19 @@ bool OTRecordList::Populate()
             // OPTIMIZE FYI: m_bRunFast impacts run speed here.
             Ledger* pExpiredbox =
                 m_bRunFast
-                    ? OTAPI_Wrap::OTAPI()->LoadExpiredBoxNoVerify(theNotaryID,
-                                                                  theNymID)
-                    : OTAPI_Wrap::OTAPI()->LoadExpiredBox(theNotaryID,
-                                                          theNymID);
+                    ? OTAPI_Wrap::OTAPI()->LoadExpiredBoxNoVerify(theNotaryID, theNymID)
+                    : OTAPI_Wrap::OTAPI()->LoadExpiredBox(theNotaryID, theNymID);
             std::unique_ptr<Ledger> theExpiredBoxAngel(pExpiredbox);
 
             // It loaded up, so let's loop through it.
-            if (nullptr != pExpiredbox) {
-                for (auto& it : pExpiredbox->GetTransactionMap()) {
+            if (nullptr != pExpiredbox)
+            {
+                for (auto& it : pExpiredbox->GetTransactionMap())
+                {
                     OTTransaction* pBoxTrans = it.second;
                     OT_ASSERT(nullptr != pBoxTrans);
                     bool bOutgoing = false;
+                    
                     // Let's say Alice sends a payment plan to Bob, and then Bob
                     // activates it. Alice will receive a notice, via her Nymbox,
                     // which will be placed in her Nym record box. (The pending outgoing
@@ -2396,8 +2305,8 @@ bool OTRecordList::Populate()
                     // notice in her record box relates to her SENT plan, not a received
                     // plan. It needs to show up as outgoing/sent, NOT incoming/received.
                     //
-                    if (OTTransaction::notice == pBoxTrans->GetType())
-                        bOutgoing = true;
+//                  if (OTTransaction::notice == pBoxTrans->GetType())
+//                      bOutgoing = true;
                     ++nIndex; // 0 on first iteration.
                     otInfo << __FUNCTION__
                           << ": Expired payment RECORD index: " << nIndex
@@ -2408,86 +2317,73 @@ bool OTRecordList::Populate()
                     std::string str_other_nym_id;
                     std::string str_other_acct_id;
 
-                    if (!pBoxTrans->IsAbbreviated()) {
+                    if (!pBoxTrans->IsAbbreviated())
+                    {
                         Identifier theSenderID, theSenderAcctID;
                         Identifier theRecipientID, theRecipientAcctID;
 
-                        if (pBoxTrans->GetSenderNymIDForDisplay(theSenderID)) {
+                        if (pBoxTrans->GetSenderNymIDForDisplay(theSenderID))
+                        {
                             const String strSenderID(theSenderID);
                             const std::string str_sender_id(strSenderID.Get());
 
-                            // Usually, Nym is the RECIPIENT. Sometimes he's the
-                            // sender.
-                            // Either way, we want the OTHER ID (the other Nym)
-                            // for display.
-                            // So here, if Nym's CLEARLY the sender, then we
-                            // want the RECIPIENT.
-                            // Whereas if Nym were the recipient, then we'd want
-                            // the SENDER. (For display.)
+                            // Usually, Nym is the RECIPIENT. Sometimes he's the sender.
+                            // Either way, we want the OTHER ID (the other Nym) for display.
+                            // So here, if Nym's CLEARLY the sender, then we want the RECIPIENT.
+                            // Whereas if Nym were the recipient, then we'd want the SENDER. (For display.)
                             //
                             if (0 ==
-                                str_nym_id.compare(str_sender_id)) // str_nym_id
-                                                                   // IS
-                            // str_sender_id.
-                            // (Therefore we want
-                            // recipient.)
+                                str_nym_id.compare(str_sender_id)) // str_nym_id IS str_sender_id. (Therefore we want recipient.)
                             {
-                                bOutgoing = true; // if Nym is the sender, then
-                                                  // it must have been outgoing.
+                                if (OTTransaction::notice == pBoxTrans->GetType())
+                                    bOutgoing = false; // Payment Plan "sender" of funds (payer) is the recipient of the plan.
+                                else
+                                    bOutgoing = true; // if Nym is the sender, then it must have been outgoing.
 
-                                if (pBoxTrans->GetRecipientNymIDForDisplay(
-                                        theRecipientID)) {
+                                if (pBoxTrans->GetRecipientNymIDForDisplay(theRecipientID))
+                                {
                                     const String strRecipientID(theRecipientID);
-                                    const std::string str_recipient_id(
-                                        strRecipientID.Get());
+                                    const std::string str_recipient_id(strRecipientID.Get());
 
-                                    String strName(m_pLookup->GetNymName(
-                                        str_recipient_id, it_server)),
-                                        strNameTemp;
+                                    String strName(m_pLookup->GetNymName(str_recipient_id, it_server)), strNameTemp;
 
                                     if (strName.Exists())
-                                        strNameTemp.Format(
-                                            OTRecordList::textTo(),
-                                            strName.Get());
+                                        strNameTemp.Format(OTRecordList::textTo(), strName.Get());
                                     else
-                                        strNameTemp.Format(
-                                            OTRecordList::textTo(),
-                                            str_recipient_id.c_str());
+                                        strNameTemp.Format(OTRecordList::textTo(), str_recipient_id.c_str());
 
                                     str_name = strNameTemp.Get();
                                     str_other_nym_id = str_recipient_id;
-                                    if (pBoxTrans->GetRecipientAcctIDForDisplay(
-                                            theRecipientAcctID)) {
-                                        const String strRecipientAcctID(
-                                            theRecipientAcctID);
-                                        str_other_acct_id =
-                                            strRecipientAcctID.Get();
+                                    
+                                    if (pBoxTrans->GetRecipientAcctIDForDisplay(theRecipientAcctID))
+                                    {
+                                        const String strRecipientAcctID(theRecipientAcctID);
+                                        str_other_acct_id = strRecipientAcctID.Get();
                                     }
                                 }
                             }
-                            else // str_nym_id IS NOT str_sender_id.
-                                   // (Therefore we want sender.)
-                            { // In this case, some OTHER Nym is the sender, so
-                                // it must have been incoming. (And bOutgoing is
-                                // already false.)
+                            else // str_nym_id IS NOT str_sender_id. (Therefore we want sender.)
+                            {    // In this case, some OTHER Nym is the sender, so it must have been incoming.
+                                 // (And bOutgoing is already false.)
 
-                                String strName(m_pLookup->GetNymName(
-                                    str_sender_id, it_server)),
-                                    strNameTemp;
+                                if (OTTransaction::notice == pBoxTrans->GetType())
+                                    bOutgoing = true; // Payment Plan "recipient" of funds (merchant) is the sender of the plan.
+                                else
+                                    bOutgoing = false;
+
+                                String strName(m_pLookup->GetNymName(str_sender_id, it_server)), strNameTemp;
 
                                 if (strName.Exists())
-                                    strNameTemp.Format(OTRecordList::textFrom(),
-                                                       strName.Get());
+                                    strNameTemp.Format(OTRecordList::textFrom(), strName.Get());
                                 else
-                                    strNameTemp.Format(OTRecordList::textFrom(),
-                                                       str_sender_id.c_str());
+                                    strNameTemp.Format(OTRecordList::textFrom(), str_sender_id.c_str());
 
                                 str_name = strNameTemp.Get();
                                 str_other_nym_id = str_sender_id;
-                                if (pBoxTrans->GetSenderAcctIDForDisplay(
-                                        theSenderAcctID)) {
-                                    const String strSenderAcctID(
-                                        theSenderAcctID);
+                                
+                                if (pBoxTrans->GetSenderAcctIDForDisplay(theSenderAcctID))
+                                {
+                                    const String strSenderAcctID(theSenderAcctID);
                                     str_other_acct_id = strSenderAcctID.Get();
                                 }
                             }
@@ -2495,68 +2391,55 @@ bool OTRecordList::Populate()
                         // In this block below, we already KNOW
                         // GetSenderNymIDForDisplay is EMPTY.
                         // (So it's "recipient or bust.")
-                        else if (pBoxTrans->GetRecipientNymIDForDisplay(
-                                     theRecipientID)) {
+                        else if (pBoxTrans->GetRecipientNymIDForDisplay(theRecipientID))
+                        {
                             const String strRecipientID(theRecipientID);
-                            const std::string str_recipient_id(
-                                strRecipientID.Get());
+                            const std::string str_recipient_id(strRecipientID.Get());
 
                             if (0 !=
-                                str_nym_id.compare(
-                                    str_recipient_id)) // str_nym_id is NOT
-                                                       // str_recipient_id.
-                                                       // (Therefore we want
-                                                       // str_recipient_id.)
-                            {
-                                // If Nym is not the recipient, then he must be
-                                // the sender.
+                                str_nym_id.compare(str_recipient_id)) // str_nym_id is NOT str_recipient_id.
+                            {                                         // (Therefore we want str_recipient_id.)
+                                // If Nym is not the recipient, then he must be the sender.
                                 // (Therefore it must be outgoing.)
-                                bOutgoing = true;
+                                
+                                if (OTTransaction::notice == pBoxTrans->GetType())
+                                    bOutgoing = false; // Payment Plan "sender" of funds (payer) is the recipient of the plan.
+                                else
+                                    bOutgoing = true; // if Nym is the sender, then it must have been outgoing.
 
-                                String strName(m_pLookup->GetNymName(
-                                    str_recipient_id, it_server)),
-                                    strNameTemp;
+                                String strName(m_pLookup->GetNymName(str_recipient_id, it_server)), strNameTemp;
 
                                 if (strName.Exists())
-                                    strNameTemp.Format(OTRecordList::textTo(),
-                                                       strName.Get());
+                                    strNameTemp.Format(OTRecordList::textTo(), strName.Get());
                                 else
-                                    strNameTemp.Format(
-                                        OTRecordList::textTo(),
-                                        str_recipient_id.c_str());
+                                    strNameTemp.Format(OTRecordList::textTo(), str_recipient_id.c_str());
 
                                 str_name = strNameTemp.Get();
                                 str_other_nym_id = str_recipient_id;
-                                if (pBoxTrans->GetRecipientAcctIDForDisplay(
-                                        theRecipientAcctID)) {
-                                    const String strRecipientAcctID(
-                                        theRecipientAcctID);
-                                    str_other_acct_id =
-                                        strRecipientAcctID.Get();
+                                
+                                if (pBoxTrans->GetRecipientAcctIDForDisplay(theRecipientAcctID))
+                                {
+                                    const String strRecipientAcctID(theRecipientAcctID);
+                                    str_other_acct_id = strRecipientAcctID.Get();
                                 }
                             }
                         }
                     } // if not abbreviated.
-                    time64_t tValidFrom = OT_TIME_ZERO, tValidTo = OT_TIME_ZERO;
-                    std::string str_date =
-                        "0"; // the "date signed" on the transaction receipt.
+                    time64_t tValidFrom  = OT_TIME_ZERO, tValidTo = OT_TIME_ZERO;
+                    std::string str_date = "0"; // the "date signed" on the transaction receipt.
                     time64_t tDateSigned = pBoxTrans->GetDateSigned();
 
-                    if (tDateSigned > OT_TIME_ZERO) {
+                    if (tDateSigned > OT_TIME_ZERO)
+                    {
                         tValidFrom = tDateSigned;
-                        const uint64_t lDateSigned =
-                            OTTimeGetSecondsFromTime(tDateSigned);
+                        const uint64_t lDateSigned = OTTimeGetSecondsFromTime(tDateSigned);
                         String strDateSigned;
                         strDateSigned.Format("%" PRIu64 "", lDateSigned);
                         str_date = strDateSigned.Get();
                     }
-                    const std::string* p_str_asset_type =
-                        &OTRecordList::s_blank; // <========== ASSET TYPE
-                    const std::string* p_str_asset_name =
-                        &OTRecordList::s_blank; // instrument definition display
-                                                // name.
-                    const std::string* p_str_account =
-                        &OTRecordList::s_blank; // <========== ACCOUNT
+                    const std::string* p_str_asset_type = &OTRecordList::s_blank; // <========== ASSET TYPE
+                    const std::string* p_str_asset_name = &OTRecordList::s_blank; // instrument definition display name.
+                    const std::string* p_str_account    = &OTRecordList::s_blank; // <========== ACCOUNT
                     std::string str_amount;     // <========== AMOUNT
                     std::string str_type;       // Instrument type.
                     std::string str_memo; // Instrument memo (if applicable.)
@@ -2564,45 +2447,38 @@ bool OTRecordList::Populate()
 
                     int64_t lPaymentInstrumentTransNum = 0, lPaymentInstrumentTransNumDisplay = 0;
                     
-                    if (pBoxTrans->IsAbbreviated()) {
-                        str_type =
-                            pBoxTrans->GetTypeString(); // instrumentNotice,
-                                                        // etc.
+                    if (pBoxTrans->IsAbbreviated())
+                    {
+                        str_type = pBoxTrans->GetTypeString(); // instrumentNotice, etc.
                         int64_t lAmount = pBoxTrans->GetAbbrevDisplayAmount();
 
-                        if (0 != lAmount) {
+                        if (0 != lAmount)
+                        {
                             String strTemp;
                             strTemp.Format("%" PRId64 "", lAmount);
                             str_amount = strTemp.Get();
                         }
                     }
-                    else // NOT abbreviated. (Full box receipt is already
-                           // loaded.)
+                    else // NOT abbreviated. (Full box receipt is already loaded.)
                     {
-                        OTPayment* pPayment = GetInstrument(
-                            *pNym, nIndex,
-                            *pExpiredbox); //===> Returns financial instrument
-                                           // by index.
+                        OTPayment* pPayment = GetInstrument(*pNym, nIndex, *pExpiredbox); //===> Returns financial instrument by index.
                         std::unique_ptr<OTPayment> thePaymentAngel(pPayment);
-                        if (nullptr ==
-                            pPayment) // then we treat it like it's abbreviated.
+                        
+                        if (nullptr == pPayment) // then we treat it like it's abbreviated.
                         {
-                            str_type =
-                                pBoxTrans->GetTypeString(); // instrumentNotice,
-                                                            // etc.
-                            int64_t lAmount =
-                                pBoxTrans->GetAbbrevDisplayAmount();
+                            str_type = pBoxTrans->GetTypeString(); // instrumentNotice, etc.
+                            int64_t lAmount = pBoxTrans->GetAbbrevDisplayAmount();
 
-                            if (0 != lAmount) {
+                            if (0 != lAmount)
+                            {
                                 String strTemp;
                                 strTemp.Format("%" PRId64 "", lAmount);
                                 str_amount = strTemp.Get();
                             }
                         }
-                        // We have pPayment, the instrument accompanying the
-                        // receipt in the payments recordbox.
-                        else if (pPayment->SetTempValues()) {
-                            
+                        // We have pPayment, the instrument accompanying the receipt in the payments recordbox.
+                        else if (pPayment->SetTempValues())
+                        {
                             int64_t lOpeningNum = 0;
                             if (pPayment->GetOpeningNum(lOpeningNum, theNymID))
                                 lPaymentInstrumentTransNum = lOpeningNum;
@@ -2617,9 +2493,9 @@ bool OTRecordList::Populate()
                             pPayment->GetValidFrom(tValidFrom);
                             pPayment->GetValidTo(tValidTo);
 
-                            if (tValidFrom > OT_TIME_ZERO) {
-                                const uint64_t lFrom =
-                                    OTTimeGetSecondsFromTime(tValidFrom);
+                            if (tValidFrom > OT_TIME_ZERO)
+                            {
+                                const uint64_t lFrom = OTTimeGetSecondsFromTime(tValidFrom);
                                 String strFrom;
                                 strFrom.Format("%" PRIu64 "", lFrom);
                                 str_date = strFrom.Get();
@@ -2629,8 +2505,8 @@ bool OTRecordList::Populate()
 
                             if (bOutgoing) // Nym is sender.
                             {
-                                if ( (pPayment->IsPaymentPlan() && pPayment->GetRecipientAcctID(theAccountID)) ||
-                                    pPayment->GetSenderAcctIDForDisplay( theAccountID)) // Since Nym is ME, the Account must be MY acct.
+                                if ( ( (pPayment->IsPaymentPlan() || pPayment->IsNotice()) && pPayment->GetRecipientAcctID(theAccountID)) ||
+                                    pPayment->GetSenderAcctIDForDisplay(theAccountID)) // Since Nym is ME, the Account must be MY acct.
                                 { // (If this record was originally OUTgoing, then the SENDER's account is MY acct.)
                                     // UPDATE: Unless I sent a payment plan proposal. In which case I, the merchant,
                                     // am the "sender" of the proposal, but the "sender" on the instrument is the customer,
@@ -2640,33 +2516,21 @@ bool OTRecordList::Populate()
                                     // start to arrive.) Thus, though the merchant is the "sender" of the proposal, he's the
                                     // "recipient" on the instrument.
                                     String strTemp(theAccountID);
-                                    std::string str_outpmt_account =
-                                        strTemp.Get(); // The accountID we found
-                                                       // on the payment (only
-                                                       // applies to outgoing
-                                                       // payments.)
-                                    auto it_acct = std::find(
-                                        m_accounts.begin(), m_accounts.end(),
-                                        str_outpmt_account);
-                                    if (it_acct !=
-                                        m_accounts.end()) // Found it on the
-                                                          // list of accounts we
-                                                          // care about.
+                                    std::string str_outpmt_account = strTemp.Get(); // The accountID we found on the payment (only applies to outgoing payments.)
+                                    auto it_acct = std::find(m_accounts.begin(), m_accounts.end(), str_outpmt_account);
+                                    if (it_acct != m_accounts.end()) // Found it on the list of accounts we care about.
                                     {
                                         p_str_account = &(*it_acct);
                                     }
-                                    else {
-                                        // There was definitely an account on
-                                        // the instrument, and it definitely
-                                        // did not match any of the accounts
-                                        // that we care about.
+                                    else
+                                    {
+                                        // There was definitely an account on the instrument, and it definitely
+                                        // did not match any of the accounts that we care about.
                                         // Therefore, skip.
                                         //
                                         otInfo
                                             << __FUNCTION__
-                                            << ": Skipping 'sent payment' "
-                                               "expired record. (We don't care "
-                                               "about account "
+                                            << ": Skipping 'sent payment' expired record. (We don't care about account "
                                             << str_outpmt_account.c_str()
                                             << ")\n";
                                         continue;
@@ -2675,112 +2539,71 @@ bool OTRecordList::Populate()
                             }
                             else // Nym is recipient.
                             {
-                                // Why is this here? Because if Nym is
-                                // recipient, let's say he received an
-                                // instrumentNotice containing
-                                // a sendNymInstrument message containing an
-                                // incoming cheque. Well... that incoming cheque
-                                // (the payload
-                                // on sendNymInstrument message) is ENCRYPTED.
-                                // Meaning the above calls to
-                                // pBoxReceipt->GetSenderAcctID
-                                // on the instrumentNotice transaction will
-                                // FAIL. One option is to pass pNym into
-                                // GetSenderAcctID so it
-                                // can decrypt the payload and return the value.
-                                // But since we already have the payload
-                                // decrypted here
-                                // (we already have the cheque loaded up here)
-                                // we can just grab the senderAcctID directly
-                                // from the cheque.
-                                // That's why this is here -- because this is
-                                // where we KNOW we have the account ID -- so we
-                                // grab it.
+                                // Why is this here? Because if Nym is recipient, let's say he received
+                                // an instrumentNotice containing a sendNymInstrument message containing
+                                // an incoming cheque. Well... that incoming cheque (the payload on
+                                // sendNymInstrument message) is ENCRYPTED. Meaning the above calls to
+                                // pBoxReceipt->GetSenderAcctID on the instrumentNotice transaction will
+                                // FAIL. One option is to pass pNym into GetSenderAcctID so it can
+                                // decrypt the payload and return the value. But since we already have
+                                // the payload decrypted here (we already have the cheque loaded up
+                                // here) we can just grab the senderAcctID directly from the cheque.
+                                // That's why this is here -- because this is where we KNOW we have the
+                                // account ID -- so we grab it.
                                 //
                                 if (str_other_acct_id.empty() &&
-                                    (pPayment->GetSenderAcctIDForDisplay(
-                                        theAccountID))) {
+                                    ( ( (pPayment->IsPaymentPlan() || pPayment->IsNotice()) && pPayment->GetRecipientAcctID(theAccountID)) ||
+                                     pPayment->GetSenderAcctIDForDisplay(theAccountID))
+                                    )
+                                {
                                     String strTemp(theAccountID);
                                     str_other_acct_id = strTemp.Get();
                                 }
                             }
                             // By this point, p_str_account is definitely set.
-                            OT_ASSERT(nullptr !=
-                                      p_str_account); // and it's either
-                                                      // blank, or it's
-                                                      // one of the
-                                                      // accounts we
-                                                      // care about.
+                            OT_ASSERT(nullptr != p_str_account); // and it's either blank, or it's one of the accounts we care about.
                             Identifier theInstrumentDefinitionID;
 
-                            if (pPayment->GetInstrumentDefinitionID(
-                                    theInstrumentDefinitionID)) {
+                            if (pPayment->GetInstrumentDefinitionID(theInstrumentDefinitionID))
+                            {
                                 String strTemp(theInstrumentDefinitionID);
-                                const std::string str_inpmt_asset(
-                                    strTemp.Get()); // The instrument definition
-                                                    // we found
-                                                    // on the payment (if we
-                                                    // found anything.)
+                                const std::string str_inpmt_asset(strTemp.Get()); // The instrument definition we found on the payment (if we found anything.)
                                 auto it_asset = m_assets.find(str_inpmt_asset);
-                                if (it_asset != m_assets.end()) // Found it on
-                                                                // the map of
-                                // instrument definitions
-                                // we care
-                                // about.
+                                if (it_asset != m_assets.end()) // Found it on the map of instrument definitions we care about.
                                 {
-                                    p_str_asset_type =
-                                        &(it_asset->first); // Set the asset
-                                                            // type ID.
-                                    p_str_asset_name =
-                                        &(it_asset->second); // The CurrencyTLA.
-                                                             // Examples: USD,
-                                                             // BTC, etc.
+                                    p_str_asset_type = &(it_asset->first); // Set the asset type ID.
+                                    p_str_asset_name = &(it_asset->second); // The CurrencyTLA. Examples: USD, BTC, etc.
                                 }
-                                else {
-                                    // There was definitely an instrument
-                                    // definition on the
-                                    // instrument, and it definitely
-                                    // did not match any of the assets that we
-                                    // care about.
+                                else
+                                {
+                                    // There was definitely an instrument definition on the instrument, and
+                                    // it definitely did not match any of the assets that we care about.
                                     // Therefore, skip.
                                     //
                                     otErr
                                         << __FUNCTION__
-                                        << ": Skipping: Expired payment record "
-                                           "(we don't care about instrument "
-                                           "definition "
+                                        << ": Skipping: Expired payment record (we don't care about instrument definition "
                                         << str_inpmt_asset.c_str() << ")\n";
                                     continue;
                                 }
                             }
                             // By this point, p_str_asset_type and
                             // p_str_asset_name are definitely set.
-                            OT_ASSERT(nullptr != p_str_asset_type); // and it's
-                                                                    // either
-                                                                    // blank, or
-                            // it's one of
-                            // the asset
-                            // types we
-                            // care about.
-                            OT_ASSERT(nullptr != p_str_asset_name); // and it's
-                                                                    // either
-                                                                    // blank, or
-                            // it's one of
-                            // the asset
-                            // types we
-                            // care about.
+                            OT_ASSERT(nullptr != p_str_asset_type); // and it's either blank, or it's one of the asset types we care about.
+                            OT_ASSERT(nullptr != p_str_asset_name); // and it's either blank, or it's one of the asset types we care about.
                             String strMemo;
-                            if (pPayment->GetMemo(strMemo)) {
+                            if (pPayment->GetMemo(strMemo))
+                            {
                                 str_memo = strMemo.Get();
                             }
                             // Instrument type (cheque, voucher, etc)
-                            int32_t nType =
-                                static_cast<int32_t>(pPayment->GetType());
+                            int32_t nType = static_cast<int32_t>(pPayment->GetType());
 
                             str_type = GetTypeString(nType);
                             int64_t lAmount = 0;
 
-                            if (pPayment->GetAmount(lAmount)) {
+                            if (pPayment->GetAmount(lAmount))
+                            {
                                 String strTemp;
                                 strTemp.Format("%" PRId64 "", lAmount);
                                 str_amount = strTemp.Get();
@@ -2794,21 +2617,14 @@ bool OTRecordList::Populate()
                     shared_ptr_OTRecord sp_Record(new OTRecord(*this, 
                         it_server, *p_str_asset_type, *p_str_asset_name,
                         str_nym_id,     // This is the Nym WHOSE BOX IT IS.
-                        *p_str_account, // This is the Nym's account for this
-                                        // box. (Blank for incoming, set for
-                                        // outgoing.)
-                        // Everything above this line, it stores a reference to
-                        // an external string.
-                        // Everything below this line, it makes its own internal
-                        // copy of the string.
-                        str_name, // name of sender or recipient (since its in
-                                  // the recordbox.)
+                        *p_str_account, // This is the Nym's account for this box. (Blank for incoming, set for outgoing.)
+                        // Everything above this line, it stores a reference to an external string.
+                        // Everything below this line, it makes its own internal copy of the string.
+                        str_name, // name of sender or recipient (since its in the recordbox.)
                         str_date, // the "date signed" on the receipt.
                         str_amount, str_type, // pending, chequeReceipt, etc.
-                        false, // Everything in the recordbox is finished. (NOT
-                               // pending.)
-                        bOutgoing, // Since it's the recordbox, it contains both
-                                   // incoming and outgoing receipts.
+                        false, // Everything in the recordbox is finished. (NOT pending.)
+                        bOutgoing, // Since it's the recordbox, it contains both incoming and outgoing receipts.
                         true,      // IsRecord
                         false,     // IsReceipt,
                         OTRecord::Instrument));
@@ -2827,8 +2643,7 @@ bool OTRecordList::Populate()
                         sp_Record->SetTransNumForDisplay(lPaymentInstrumentTransNumDisplay);
                     else
                         sp_Record->SetTransNumForDisplay(pBoxTrans->GetReferenceNumForDisplay());
-                    sp_Record->SetTransactionNum(
-                        pBoxTrans->GetTransactionNum());
+                    sp_Record->SetTransactionNum(pBoxTrans->GetTransactionNum());
 
                     m_contents.push_back(sp_Record);
 

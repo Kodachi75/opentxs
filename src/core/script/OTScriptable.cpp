@@ -185,43 +185,43 @@ bool OTScriptable::ValidateBylawName(std::string str_name)
 {
     if (!ValidateName(str_name))
         return false;
-    
+
     return true;
 }
-    
+
 //static
 bool OTScriptable::ValidatePartyName(std::string str_name)
 {
     if (!ValidateName(str_name))
         return false;
-    
+
     return true;
 }
-    
+
 //static
 bool OTScriptable::ValidateAgentName(std::string str_name)
 {
     if (!ValidateName(str_name))
         return false;
-    
+
     return true;
 }
-    
+
 //static
 bool OTScriptable::ValidateAccountName(std::string str_name)
 {
     if (!ValidateName(str_name))
         return false;
-    
+
     return true;
 }
-    
+
 //static
 bool OTScriptable::ValidateVariableName(std::string str_name)
 {
     if (!ValidateName(str_name))
         return false;
-    
+
     // This prefix is disallowed since it's reserved for clause parameter names.
     //
     if (str_name.compare(0, 6, "param_") == 0) {
@@ -237,13 +237,13 @@ bool OTScriptable::ValidateVariableName(std::string str_name)
 
     return true;
 }
-    
+
 //static
 bool OTScriptable::ValidateClauseName(std::string str_name)
 {
     if (!ValidateName(str_name))
         return false;
-    
+
     // To avoid confusion, we disallow clauses beginning in cron_ or hook_ or
     // callback_
     //
@@ -253,14 +253,14 @@ bool OTScriptable::ValidateClauseName(std::string str_name)
         "should not start with 'cron_'\n";
         return false;
     }
-    
+
     if (0 == str_name.compare(0, 5, "hook_")) // todo stop hardcoding
     {
         otOut << "OTScriptable::" << __FUNCTION__ << ": Invalid Clause name: '" << str_name << "'. name "
         "should not start with 'hook_'\n";
         return false;
     }
-    
+
     if (0 == str_name.compare(0, 9, "callback_")) // todo stop hardcoding
     {
         otOut << "OTScriptable::" << __FUNCTION__ << ": Invalid Clause name: '" << str_name << "'. name "
@@ -270,13 +270,13 @@ bool OTScriptable::ValidateClauseName(std::string str_name)
 
     return true;
 }
-    
+
 //static
 bool OTScriptable::ValidateHookName(std::string str_name)
 {
     if (!ValidateName(str_name))
         return false;
-    
+
     if ((str_name.compare(0, 5, "cron_") != 0) &&
         (str_name.compare(0, 5, "hook_") != 0))
     {
@@ -287,13 +287,13 @@ bool OTScriptable::ValidateHookName(std::string str_name)
 
     return true;
 }
-    
+
 //static
 bool OTScriptable::ValidateCallbackName(std::string str_name)
 {
     if (!ValidateName(str_name))
         return false;
-    
+
     // If the callback name DOESN'T begin with 'callback_' then it is
     // rejected.
     if (0 != str_name.compare(0, 9, "callback_"))
@@ -302,7 +302,7 @@ bool OTScriptable::ValidateCallbackName(std::string str_name)
         "'. MUST begin with 'callback_'.\n";
         return false;
     }
-    
+
     return true;
 }
 
@@ -2128,7 +2128,7 @@ bool OTScriptable::ConfirmParty(OTParty& theParty)
         //
         m_mapParties.insert(
             std::pair<std::string, OTParty*>(str_party_name, &theParty));
-        
+
         openingNumsInOrderOfSigning_.push_back(theParty.GetOpeningTransNo());
 
         theParty.SetOwnerAgreement(*this); // Now the actual party is in place,
@@ -2206,14 +2206,14 @@ bool OTScriptable::RemoveParty(std::string str_Name)
         otErr << "OTScriptable::" << __FUNCTION__ << ":  Error: invalid name.\n";
         return false;
     }
-    
+
     auto it = m_mapParties.find(str_Name);
-    
+
     if (m_mapParties.end() != it) // Found it.
     {
         OTParty * pParty = it->second;
         OT_ASSERT(nullptr != pParty);
-        
+
         m_mapParties.erase(it);
         delete pParty; pParty = nullptr;
         return true;
@@ -2221,10 +2221,10 @@ bool OTScriptable::RemoveParty(std::string str_Name)
     else
         otOut << "OTScriptable::" << __FUNCTION__ << ": Failed attempt: party didn't exist "
         "on contract.\n ";
-    
+
     return false;
 }
-    
+
 bool OTScriptable::RemoveBylaw(std::string str_Name)
 {
     if (!OTScriptable::ValidateBylawName(str_Name)) // this logs, FYI.
@@ -2232,14 +2232,14 @@ bool OTScriptable::RemoveBylaw(std::string str_Name)
         otErr << "OTScriptable::" << __FUNCTION__ << ":  Error: invalid name.\n";
         return false;
     }
-    
+
     auto it = m_mapBylaws.find(str_Name);
-    
+
     if (m_mapBylaws.end() != it) // Found it.
     {
         OTBylaw * pBylaw = it->second;
         OT_ASSERT(nullptr != pBylaw);
-        
+
         m_mapBylaws.erase(it);
         delete pBylaw; pBylaw = nullptr;
         return true;
@@ -2247,10 +2247,10 @@ bool OTScriptable::RemoveBylaw(std::string str_Name)
     else
         otOut << "OTScriptable::" << __FUNCTION__ << ": Failed attempt: bylaw didn't exist "
         "on contract.\n ";
-    
+
     return false;
 }
-    
+
 bool OTScriptable::AddBylaw(OTBylaw& theBylaw)
 {
     const std::string str_name = theBylaw.GetName().Get();
@@ -2385,7 +2385,7 @@ void OTScriptable::CalculateContractID(Identifier& newID) const
 std::string vectorToString(const std::vector<int64_t> & v)
 {
     std::stringstream ss;
-    
+
     for (size_t i = 0; i < v.size(); ++i)
     {
         if(i != 0)
@@ -2398,16 +2398,16 @@ std::string vectorToString(const std::vector<int64_t> & v)
 std::vector<int64_t> stringToVector(const std::string & s)
 {
     std::stringstream stream(s);
-    
+
     std::vector<int64_t> results;
-    
+
     int64_t n;
     while(stream >> n)
     {
         results.push_back(n);
     }
-    
-    return std::move(results);
+
+    return results;
 }
 
 void OTScriptable::UpdateContentsToTag(Tag& parent, bool bCalculatingID) const
@@ -2424,7 +2424,7 @@ void OTScriptable::UpdateContentsToTag(Tag& parent, bool bCalculatingID) const
         pTag->add_attribute("specifyParties", formatBool(m_bSpecifyParties));
         pTag->add_attribute("numParties", formatUint(sizePartyMap));
         pTag->add_attribute("numBylaws", formatUint(sizeBylawMap));
-    
+
         const std::string str_vector = vectorToString(openingNumsInOrderOfSigning_);
         pTag->add_attribute("openingNumsInOrderOfSigning", str_vector);
 
@@ -2514,7 +2514,7 @@ int32_t OTScriptable::ProcessXMLNode(irr::io::IrrXMLReader*& xml)
         }
         else
             openingNumsInOrderOfSigning_.clear();
-        
+
         // These determine whether instrument definition ids and/or party owner
         // IDs
         // are used on the template for any given smart contract.
@@ -3503,7 +3503,7 @@ bool OTScriptable::GetHooks(std::string str_HookName, mapOfClauses& theResults)
     return bReturnVal;
 }
 
-    
+
 bool OTScriptable::arePartiesSpecified() const
 {
     return m_bSpecifyParties;
@@ -3517,12 +3517,12 @@ void OTScriptable::specifyParties(bool bNewState)
 {
     m_bSpecifyParties = bNewState;
 }
-    
+
 void OTScriptable::specifyAssetTypes(bool bNewState)
 {
     m_bSpecifyInstrumentDefinitionID = bNewState;
 }
-    
+
 void OTScriptable::Release_Scriptable()
 {
     // Go through the existing list of parties and bylaws at this point, and

@@ -1505,7 +1505,11 @@ bool OTWallet::SaveContract(String& strContract)
                                           "OTWallet::SaveContract");
 
         TagPtr pTag(new Tag("notaryProvider"));
-        pTag->add_attribute("name", pServer->Name().Get());
+        
+        OTASCIIArmor ascServerName;
+        if (pServer->Name().Exists())
+            ascServerName.SetString(pServer->Name(), false);
+        pTag->add_attribute("name", ascServerName.Get());
         pTag->add_attribute("notaryID", pServer->ID().Get());
         tag.add_tag(pTag);
     }
@@ -2093,8 +2097,6 @@ bool OTWallet::LoadWallet(const char* szFilename)
                         ascServerName.GetString(ServerName,
                                                 false); // linebreaks == false
 
-                    //                    ServerName =
-                    // xml->getAttributeValue("name");
                     NotaryID =
                         xml->getAttributeValue("notaryID"); // hash of contract
 
@@ -2114,6 +2116,7 @@ bool OTWallet::LoadWallet(const char* szFilename)
                                   "OTWallet::LoadWallet\n");
 
                     if (pContract) {
+                        pContract->SetName(ServerName);
                         otWarn << "** Server Contract Verified "
                                     "**\n------------------------------------"
                                     "----------------------------------------"

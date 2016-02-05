@@ -111,8 +111,7 @@ OTPayment::paymentType OTPayment::GetTypeFromString(const String& strType)
 // values will
 // be available thereafter.
 //
-bool OTPayment::SetTempValues() // this version for OTTrackable (all types
-                                // EXCEPT purses.)
+bool OTPayment::SetTempValues() // This version for OTTrackable (all types EXCEPT purses.)
 {
     if (OTPayment::PURSE == m_Type) {
         // Perform instantiation of a purse, then use it to set the temp values,
@@ -330,6 +329,12 @@ bool OTPayment::SetTempValuesFromNotice(const OTTransaction& theInput)
         
         if (nullptr != pItem)            // The item's NOTE, as opposed to the transaction's reference string,
             pItem->GetNote(strCronItem); // contains the updated version of the cron item, versus the original.
+//        else
+//        {
+//            otErr << "DEBUGGING: Failed to get the notice item! Thus forcing us to grab the old version of the payment plan instead of the current version.\n";
+//            String strBlah(theInput);
+//            otErr << "THE ACTUAL TRANSACTION:\n\n" << strBlah << "\n";
+//        }
         // -------------------------------------------
         if (!strCronItem.Exists())
             theInput.GetReferenceString(strCronItem); // Didn't find the updated one? Okay let's grab the original then.
@@ -387,6 +392,9 @@ bool OTPayment::SetTempValuesFromNotice(const OTTransaction& theInput)
     
 void OTPayment::lowLevelSetTempValuesFromPaymentPlan(const OTPaymentPlan& theInput)
 {
+//    String strDebuggin(theInput);
+//    otErr << "DEBUGGING. PAYMENT PLAN:\n" << strDebuggin << "\n";
+
     m_bAreTempValuesSet = true;
     m_bHasRecipient = true;
     m_bHasRemitter = false;
@@ -1267,7 +1275,7 @@ bool OTPayment::GetInstrumentDefinitionID(Identifier& theOutput) const
     case OTPayment::PURSE:
     case OTPayment::NOTICE:
         theOutput = m_InstrumentDefinitionID;
-        bSuccess = true;
+        bSuccess = !m_InstrumentDefinitionID.IsEmpty();
         break;
 
     case OTPayment::SMART_CONTRACT:
@@ -1298,8 +1306,8 @@ bool OTPayment::GetNotaryID(Identifier& theOutput) const
     case OTPayment::SMART_CONTRACT:
     case OTPayment::PURSE:
     case OTPayment::NOTICE:
-        theOutput = m_NotaryID;
-        bSuccess = true;
+        theOutput =  m_NotaryID;
+        bSuccess  = !m_NotaryID.IsEmpty();
         break;
 
     default:
@@ -1323,8 +1331,8 @@ bool OTPayment::GetRemitterNymID(Identifier& theOutput) const
 
     switch (m_Type) {
     case OTPayment::VOUCHER:
-        theOutput = m_RemitterNymID;
-        bSuccess = true;
+        theOutput =  m_RemitterNymID;
+        bSuccess  = !m_RemitterNymID.IsEmpty();
         break;
 
     default:
@@ -1350,8 +1358,8 @@ bool OTPayment::GetRemitterAcctID(Identifier& theOutput) const
 
     switch (m_Type) {
     case OTPayment::VOUCHER:
-        theOutput = m_RemitterAcctID;
-        bSuccess = true;
+        theOutput =  m_RemitterAcctID;
+        bSuccess  = !m_RemitterAcctID.IsEmpty();
         break;
 
     default:
@@ -1392,8 +1400,8 @@ bool OTPayment::GetSenderNymID(Identifier& theOutput) const
     case OTPayment::PAYMENT_PLAN:
     case OTPayment::SMART_CONTRACT:
     case OTPayment::NOTICE:
-        theOutput = m_SenderNymID;
-        bSuccess = true;
+        theOutput =  m_SenderNymID;
+        bSuccess  = !m_SenderNymID.IsEmpty();
         break;
 
     case OTPayment::PURSE:
@@ -1422,8 +1430,8 @@ bool OTPayment::GetSenderAcctID(Identifier& theOutput) const
     case OTPayment::INVOICE:
     case OTPayment::PAYMENT_PLAN:
     case OTPayment::NOTICE:
-        theOutput = m_SenderAcctID;
-        bSuccess = true;
+        theOutput =  m_SenderAcctID;
+        bSuccess  = !m_SenderAcctID.IsEmpty();
         break;
 
     case OTPayment::SMART_CONTRACT:
@@ -1456,7 +1464,7 @@ bool OTPayment::GetRecipientNymID(Identifier& theOutput) const
     case OTPayment::NOTICE:
         if (m_bHasRecipient) {
             theOutput = m_RecipientNymID;
-            bSuccess = true;
+            bSuccess = !m_RecipientNymID.IsEmpty();
         }
         else
             bSuccess = false;
@@ -1495,7 +1503,7 @@ bool OTPayment::GetRecipientAcctID(Identifier& theOutput) const
     case OTPayment::NOTICE:
         if (m_bHasRecipient) {
             theOutput = m_RecipientAcctID;
-            bSuccess = true;
+            bSuccess = !m_RecipientAcctID.IsEmpty();
         }
         else
             bSuccess = false;

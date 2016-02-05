@@ -1527,7 +1527,9 @@ bool OTAPI_Exec::AddServerContract(const std::string& strContract) const
     proto::ServerContract serialized;
     serialized.ParseFromArray(proto.GetPointer(), proto.GetSize());
 
-    if (!Verify(serialized)) { return false; }
+    if (!proto::Check<proto::ServerContract>(serialized, 0, 0xFFFFFFFF)) {
+        return false;
+    }
 
     std::unique_ptr<ServerContract>
         pContract(ServerContract::Factory(serialized));

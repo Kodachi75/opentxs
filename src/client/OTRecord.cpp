@@ -976,6 +976,10 @@ bool OTRecord::IsCash() const
 {
     return m_bIsCash;
 }
+bool OTRecord::IsNotice() const
+{
+    return m_bIsNotice;
+}
 bool OTRecord::IsInvoice() const
 {
     return m_bIsInvoice;
@@ -1343,6 +1347,9 @@ void OTRecord::SetContents(const std::string& str_contents)
             case OTPayment::SMART_CONTRACT:
                 m_bIsSmartContract = true;
                 break;
+            case OTPayment::NOTICE:
+                m_bIsNotice = true;
+                break;
 
             default:
                 break;
@@ -1409,6 +1416,7 @@ OTRecord::OTRecord(OTRecordList & backlink,
     , m_bIsCheque(false)
     , m_bIsInvoice(false)
     , m_bIsCash(false)
+    , m_bIsNotice(false)
     , m_bIsExpired(false)
     , m_bIsCanceled(false)
     , m_RecordType(eRecordType)

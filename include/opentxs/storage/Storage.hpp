@@ -51,6 +51,8 @@
 #include <thread>
 
 #include <opentxs-proto/verify/VerifyCredentials.hpp>
+#include <opentxs-proto/verify/VerifyContacts.hpp>
+#include <opentxs-proto/verify/VerifyContracts.hpp>
 #include <opentxs-proto/verify/VerifyStorage.hpp>
 
 #include <opentxs/storage/StorageConfig.hpp>
@@ -130,7 +132,7 @@ bool LoadProto(
         serialized.reset(new T);
         serialized->ParseFromArray(data.c_str(), data.size());
 
-        foundInPrimary = Verify(*serialized);
+        foundInPrimary = proto::Check<T>(*serialized, 0, 0xFFFFFFFF);
     }
 
     bool foundInSecondary = false;
@@ -140,7 +142,7 @@ bool LoadProto(
             serialized.reset(new T);
             serialized->ParseFromArray(data.c_str(), data.size());
 
-            foundInSecondary = Verify(*serialized);
+            foundInSecondary = proto::Check<T>(*serialized, 0, 0xFFFFFFFF);
         }
     }
 

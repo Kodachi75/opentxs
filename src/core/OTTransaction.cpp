@@ -5850,8 +5850,8 @@ int64_t OTTransaction::GetReferenceNumForDisplay()
 // The marketReceipt's "reference to" is for the original Trade, placed by the
 // trader, owned by the trader.
 //
-// 1.        pTrans1->SetReferenceToNum(theTrade.GetTransactionNum());
-// 2.       pTrans1->SetReferenceString(strOrigTrade);
+// 1. pTrans1->SetReferenceToNum(theTrade.GetTransactionNum());
+// 2. pTrans1->SetReferenceString(strOrigTrade);
 //
 // In 2, the Reference String contains the ORIGINAL TRADE, signed by the TRADER.
 //
@@ -5873,11 +5873,10 @@ int64_t OTTransaction::GetReferenceNumForDisplay()
 // The item has two attachments... The NOTE, which contains the updated
 // (server-signed) TRADE, and
 // the ATTACHMENT, which contains the updated (server-signed) OFFER. Both should
-// have the same transaction
-// number as pTrans->ReferenceTo().
+// have the same transaction number as pTrans->ReferenceTo().
 //
-// 3.       pItem1->SetNote(strTrade);
-// 4.       pItem1->SetAttachment(strOffer);
+// 3. pItem1->SetNote(strTrade);
+// 4. pItem1->SetAttachment(strOffer);
 //
 
 bool OTTransaction::GetSenderNymIDForDisplay(Identifier& theReturnID)
@@ -5894,10 +5893,70 @@ bool OTTransaction::GetSenderNymIDForDisplay(Identifier& theReturnID)
 
     if (strReference.GetLength() < 2) return false;
 
-    switch (GetType()) {
+    
+//    String strBlah(*this);
+//    
+//    otErr << "DEBUGGING OTTransaction:\n" << strBlah << "\n";
+    
+    
+    
+    
+    switch (GetType())
+    {
+    case OTTransaction::notice: // for paymentPlans AND smartcontracts.
+        {
+            String strUpdatedCronItem;
+            Item * pItem = GetItem(Item::notice);
+
+            if (nullptr != pItem)
+                pItem->GetNote(strUpdatedCronItem);
+            else if (strReference.Exists())
+                strUpdatedCronItem = strReference; // Here we make-do with the original version of the cron item, instead of the updated version.
+            else
+            {
+                otErr << "OTTransaction::" << __FUNCTION__
+                      << ": Failed trying to get notice item from notice transaction. "
+                         "Or couldn't find cron item within that we were seeking.\n";
+                return false;
+            }
+
+            std::unique_ptr<OTCronItem> pCronItem(
+                OTCronItem::NewCronItem(strUpdatedCronItem));
+
+            OTSmartContract * pSmart = dynamic_cast<OTSmartContract*>(pCronItem.get());
+
+            if (nullptr != pSmart) // if it's a smart contract...
+            {
+                if (!pSmart->GetLastSenderNymID().Exists()) return false;
+                
+                // WARNING: This may not be correct. I believe GetLastSenderNymID refers to
+                // the most recent Nym who has PAID the smart contract, versus the most recent
+                // Nym who has SENT the smart contract. So later on, if you have trouble and
+                // find yourself reading this comment, that's why!
+                //
+                // You might ask yourself, then why is it coded this way? Because this code
+                // was just copied from the paymentReceipt case block just below here.
+
+                theReturnID.SetString(pSmart->GetLastSenderNymID());
+                return !theReturnID.IsEmpty();
+            }
+            else if (nullptr != pCronItem) // else if it is any other kind of cron item...
+            {
+                theReturnID = pCronItem->GetSenderNymID();
+                return !theReturnID.IsEmpty();
+            }
+            else {
+                otErr << "OTTransaction::" << __FUNCTION__
+                      << ": Unable to load Cron Item. Should never happen. "
+                         "Receipt: " << GetTransactionNum()
+                      << "  Origin: " << GetNumberOfOrigin() << "\n";
+                return false;
+            }
+            break;
+        }
+
     case OTTransaction::paymentReceipt: // for paymentPlans AND smartcontracts.
-                                        // (If the smart contract does a
-        // payment, it leaves a paymentReceipt...)
+                                        // (If the smart contract does a payment, it leaves a paymentReceipt...)
         {
             String strUpdatedCronItem;
             Item* pItem = GetItem(Item::paymentReceipt);
@@ -5905,28 +5964,28 @@ bool OTTransaction::GetSenderNymIDForDisplay(Identifier& theReturnID)
             if (nullptr != pItem)
                 pItem->GetAttachment(strUpdatedCronItem);
             else
+            {
                 otErr << "OTTransaction::" << __FUNCTION__
-                      << ": Failed trying to get paymentReceipt item from "
-                         "paymentReceipt transaction.\n";
+                      << ": Failed trying to get paymentReceipt item from paymentReceipt transaction.\n";
+                return false;
+            }
 
             std::unique_ptr<OTCronItem> pCronItem(
                 OTCronItem::NewCronItem(strUpdatedCronItem));
 
-            OTSmartContract* pSmart =
-                dynamic_cast<OTSmartContract*>(pCronItem.get());
+            OTSmartContract* pSmart = dynamic_cast<OTSmartContract*>(pCronItem.get());
 
             if (nullptr != pSmart) // if it's a smart contract...
             {
                 if (!pSmart->GetLastSenderNymID().Exists()) return false;
 
                 theReturnID.SetString(pSmart->GetLastSenderNymID());
-                return true;
+                return !theReturnID.IsEmpty();
             }
-            else if (nullptr != pCronItem) // else if it is any other kind of
-                                             // cron item...
+            else if (nullptr != pCronItem) // else if it is any other kind of cron item...
             {
                 theReturnID = pCronItem->GetSenderNymID();
-                return true;
+                return !theReturnID.IsEmpty();
             }
             else {
                 otErr << "OTTransaction::" << __FUNCTION__
@@ -6077,25 +6136,80 @@ bool OTTransaction::GetRecipientNymIDForDisplay(Identifier& theReturnID)
 
     bool bSuccess = false;
 
-    Item* pOriginalItem = nullptr;
+    Item * pOriginalItem = nullptr;
     std::unique_ptr<Item> theItemAngel;
 
     String strReference;
     GetReferenceString(strReference);
 
-    switch (GetType()) {
-    case OTTransaction::paymentReceipt: // Used for paymentPlans AND for smart
-                                        // contracts...
+    switch (GetType())
+    {
+    case OTTransaction::notice: // Used for paymentPlans AND for smart contracts...
         {
             String strUpdatedCronItem;
-            Item* pItem = GetItem(Item::paymentReceipt);
+            Item * pItem = GetItem(Item::notice);
+
+            if (nullptr != pItem)
+                pItem->GetNote(strUpdatedCronItem);
+            else if (strReference.Exists())
+                strUpdatedCronItem = strReference; // Better than  nothing. This is the original version of the payment plan, instead of the updated verison. (Or smart contract.)
+            else
+            {
+                otErr << "OTTransaction::" << __FUNCTION__
+                      << ": Failed trying to get notice item from notice transaction, and couldn't find the instrument this notice is about.\n";
+                return false;
+            }
+
+            std::unique_ptr<OTCronItem> pCronItem(
+                OTCronItem::NewCronItem(strUpdatedCronItem));
+
+            OTSmartContract * pSmart = dynamic_cast<OTSmartContract*>(pCronItem.get());
+            OTPaymentPlan   * pPlan  = dynamic_cast<OTPaymentPlan  *>(pCronItem.get());
+
+            if (nullptr != pSmart) // if it's a smart contract...
+            {
+                if (!pSmart->GetLastRecipientNymID().Exists()) return false;
+
+                // WARNING: This might not be appropriate for a ::notice.
+                // GetLastRecipientNymID I believe refers to the last Nym to
+                // receive FUNDS from the smart contract, which is not the same
+                // thing as the last Nym to receive a COPY of the smart contract.
+                // So if this causes problems later on, this comment will be here
+                // to guide you  :-)
+                // So why is this code like this in the first place? Simple:
+                // I just copied it from the paymentReceipt case below.
+                
+                theReturnID.SetString(pSmart->GetLastRecipientNymID());
+                return !theReturnID.IsEmpty();
+            }
+            else if (nullptr != pPlan) // else if it is a payment plan...
+            {
+                theReturnID = pPlan->GetRecipientNymID();
+                return !theReturnID.IsEmpty();
+            }
+            else {
+                otErr << "OTTransaction::" << __FUNCTION__
+                      << ": Unable to load Cron Item. Should never happen. "
+                         "Receipt: " << GetTransactionNum()
+                      << "  Origin: " << GetNumberOfOrigin() << "\n";
+                return false;
+            }
+        }
+        break; // this break never actually happens. Above always returns, if triggered.
+
+    case OTTransaction::paymentReceipt: // Used for paymentPlans AND for smart contracts...
+        {
+            String strUpdatedCronItem;
+            Item * pItem = GetItem(Item::paymentReceipt);
 
             if (nullptr != pItem)
                 pItem->GetAttachment(strUpdatedCronItem);
             else
+            {
                 otErr << "OTTransaction::" << __FUNCTION__
-                      << ": Failed trying to get paymentReceipt item from "
-                         "paymentReceipt transaction.\n";
+                      << ": Failed trying to get paymentReceipt item from paymentReceipt transaction.\n";
+                return false;
+            }
 
             std::unique_ptr<OTCronItem> pCronItem(
                 OTCronItem::NewCronItem(strUpdatedCronItem));
@@ -6110,13 +6224,12 @@ bool OTTransaction::GetRecipientNymIDForDisplay(Identifier& theReturnID)
                 if (!pSmart->GetLastRecipientNymID().Exists()) return false;
 
                 theReturnID.SetString(pSmart->GetLastRecipientNymID());
-                return true;
+                return !theReturnID.IsEmpty();
             }
-            else if (nullptr !=
-                       pPlan) // else if it is any other kind of cron item...
+            else if (nullptr != pPlan) // else if it is a payment plan...
             {
                 theReturnID = pPlan->GetRecipientNymID();
-                return true;
+                return !theReturnID.IsEmpty();
             }
             else {
                 otErr << "OTTransaction::" << __FUNCTION__
@@ -6126,30 +6239,25 @@ bool OTTransaction::GetRecipientNymIDForDisplay(Identifier& theReturnID)
                 return false;
             }
         }
-        break; // this break never actually happens. Above always returns, if
-               // triggered.
+        break; // this break never actually happens. Above always returns, if triggered.
 
     case OTTransaction::instrumentNotice: {
         /*
-         Therefore, if I am looping through my Nymbox, iterating through
-         transactions, and one of them
-         is an *** instrumentNotice *** then I should expect
-         GetReferenceString(strOutput) to:
+         Therefore, if I am looping through my Nymbox, iterating through transactions, and one of them
+         is an *** instrumentNotice *** then I should expect GetReferenceString(strOutput) to:
 
          1. load up from string as an OTMessage of type "sendNymInstrument",
          -------------------------------------------------------------------
          2. and I should expect the PAYLOAD of that message to contain an
-         encrypted OTEnvelope,
+            encrypted OTEnvelope,
          3. which can be decrypted by Msg.m_strNymID2's private key,
          4. And the resulting plaintext can be loaded into memory as an
-         OTPayment object,
+            OTPayment object,
          5. ...which contains an instrument of ambiguous type.
          -------------------------------------------------------------------
          FYI:
-         OTPayment provides a consistent interface, and consolidation of
-         handling, for
-         the several financial instruments that appear on the PAYMENTS page, in
-         the PaymentsInbox.
+         OTPayment provides a consistent interface, and consolidation of handling, for
+         the several financial instruments that appear on the PAYMENTS page, in the PaymentsInbox.
          For example:
             [ Cheques, Invoices, Vouchers ],
             Payment Plans, Smart Contracts, ...and Purses.
@@ -6193,12 +6301,13 @@ bool OTTransaction::GetRecipientNymIDForDisplay(Identifier& theReturnID)
     default: // All other types have no amount -- return false.
         return false;
     }
-
+    // -------------------------------------------------------
     if (nullptr == pOriginalItem)
         return false; // Should never happen, since we always expect one based
                       // on the transaction type.
-
-    switch (GetType()) {
+    // -------------------------------------------------------
+    switch (GetType())
+    {
     case OTTransaction::transferReceipt: {
         if (pOriginalItem->GetType() != Item::acceptPending) {
             otErr << "Wrong item type attached to transferReceipt\n";
@@ -6219,7 +6328,8 @@ bool OTTransaction::GetRecipientNymIDForDisplay(Identifier& theReturnID)
     case OTTransaction::voucherReceipt: // amount is stored on voucher (attached
                                         // to depositCheque item, attached.)
         {
-            if (pOriginalItem->GetType() != Item::depositCheque) {
+            if (pOriginalItem->GetType() != Item::depositCheque)
+            {
                 otErr << __FUNCTION__ << ": Wrong item type attached to "
                       << ((OTTransaction::chequeReceipt == GetType())
                               ? "chequeReceipt"
@@ -6233,26 +6343,25 @@ bool OTTransaction::GetRecipientNymIDForDisplay(Identifier& theReturnID)
 
             // Get the cheque from the Item and load it up into a Cheque object.
             pOriginalItem->GetAttachment(strAttachment);
-            bool bLoadContractFromString =
-                theCheque.LoadContractFromString(strAttachment);
+            bool bLoadContractFromString = theCheque.LoadContractFromString(strAttachment);
 
-            if (!bLoadContractFromString) {
+            if (!bLoadContractFromString)
+            {
                 String strCheque(theCheque);
 
                 otErr << "ERROR loading cheque or voucher from string in "
                          "OTTransaction::" << __FUNCTION__ << ":\n" << strCheque
                       << "\n";
             }
-            else if (theCheque.HasRecipient()) {
+            else if (theCheque.HasRecipient())
+            {
                 theReturnID = theCheque.GetRecipientNymID();
                 bSuccess = true;
             }
-            else {
-                theReturnID =
-                    pOriginalItem->GetNymID(); // Even though the cheque
-                                               // has no recipient, I
-                                               // still get the Nym ID
-                                               // when he deposits it!
+            else
+            {
+                theReturnID = pOriginalItem->GetNymID(); // Even though the cheque has no recipient, I
+                                                         // still get the Nym ID when he deposits it!
                 bSuccess = true;
             }
         }
@@ -6279,10 +6388,11 @@ bool OTTransaction::GetSenderAcctIDForDisplay(Identifier& theReturnID)
 
     if (strReference.GetLength() < 2) return false;
 
-    switch (GetType()) {
+    switch (GetType())
+    {
     case OTTransaction::paymentReceipt: {
         String strUpdatedCronItem;
-        Item* pItem = GetItem(Item::paymentReceipt);
+        Item * pItem = GetItem(Item::paymentReceipt);
 
         if (nullptr != pItem)
             pItem->GetAttachment(strUpdatedCronItem);
@@ -6304,8 +6414,7 @@ bool OTTransaction::GetSenderAcctIDForDisplay(Identifier& theReturnID)
             theReturnID.SetString(pSmart->GetLastSenderAcctID());
             return true;
         }
-        else if (nullptr !=
-                   pCronItem) // else if it is any other kind of cron item...
+        else if (nullptr != pCronItem) // else if it is any other kind of cron item...
         {
             theReturnID = pCronItem->GetSenderAcctID();
             return true;

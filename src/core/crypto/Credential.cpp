@@ -94,7 +94,7 @@ Credential* Credential::CredentialFactory(
     Credential* result = nullptr;
 
     // This check allows all constructors to assume inputs are well-formed
-    if (!proto::Verify(serialized, purportedRole)) {
+    if (!proto::Check<proto::Credential>(serialized, 0, 0xFFFFFFFF, purportedRole)) {
         otErr << __FUNCTION__ << ": Invalid serialized credential.\n";
         return result;
     }
@@ -283,7 +283,12 @@ bool Credential::isValid(serializedCredential& credential) const
 
     credential = asSerialized(serializationMode, WITH_SIGNATURES);
 
-    return proto::Verify(*credential, role_, WITH_SIGNATURES);
+    return proto::Check<proto::Credential>(
+        *credential,
+        0,
+        0xFFFFFFFF,
+        role_,
+        true); // with signatures
 }
 
 // Overrides opentxs::ot_super()

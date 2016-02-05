@@ -52,23 +52,17 @@ class Nym;
 // Thus, we add the RECIPIENT (already have SENDER from OTTrackable.)
 //
 // While other instruments are derived from OTTrackable (like OTCheque) in order
-// to gain a transaction number and sender user/acct, Agreements are derived
-// from
+// to gain a transaction number and sender user/acct, Agreements are derived from
 // a further subclass of trackable: OTCronItem.
 //
-// OTCronItems are allowed to be posted on the OTCron object, which performs
-// regular
+// OTCronItems are allowed to be posted on the OTCron object, which performs regular
 // processing on a timely basis to the items that are posted there. In this way,
 // payment authorizations can be posted (and expire properly), and trades can be
-// posted with valid date ranges, and payment plans can be instituted, and so
-// on.
+// posted with valid date ranges, and payment plans can be instituted, and so on.
 //
-// OTAgreement is derived from OTCronItem because it allows people to post
-// Agreements
-// on OTCron until a certain expiration period, so that third parties can query
-// the
-// server and verify the agreements, and so that copies of the agreement,
-// stamped
+// OTAgreement is derived from OTCronItem because it allows people to post Agreements
+// on OTCron until a certain expiration period, so that third parties can query the
+// server and verify the agreements, and so that copies of the agreement, stamped
 // with the server's signature, can be made available to the parties and to 3rd
 // parties.
 //

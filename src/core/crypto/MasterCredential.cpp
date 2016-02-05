@@ -206,9 +206,14 @@ bool MasterCredential::Verify(const Credential& credential) const
             Credential::AS_PUBLIC,
             Credential::WITHOUT_SIGNATURES);
 
-    if (!proto::Verify(*serializedCred, credential.Role(), false)) {
-        otErr << __FUNCTION__ << ": Invalid credential syntax.\n";
-        return false;
+    if (!proto::Check<proto::Credential>(
+        *serializedCred,
+        0,
+        0xFFFFFFFF,
+        credential.Role(),
+        false)) {
+            otErr << __FUNCTION__ << ": Invalid credential syntax.\n";
+            return false;
     }
 
     bool sameMaster = (id_ == credential.MasterID());

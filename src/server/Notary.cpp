@@ -4021,9 +4021,8 @@ void Notary::NotarizePaymentPlan(Nym& theNym, Account& theDepositorAccount,
 
     const String strNymID(NYM_ID);
     pItem = tranIn.GetItem(Item::paymentPlan);
-    pBalanceItem = tranIn.GetItem(Item::transactionStatement);
-    pResponseItem =
-        Item::CreateItemFromTransaction(tranOut, Item::atPaymentPlan);
+    pBalanceItem  = tranIn.GetItem(Item::transactionStatement);
+    pResponseItem = Item::CreateItemFromTransaction(tranOut, Item::atPaymentPlan);
     pResponseItem->SetStatus(Item::rejection); // the default.
     tranOut.AddItem(*pResponseItem); // the Transaction's destructor will
                                      // cleanup the item. It "owns" it now.
@@ -4031,11 +4030,11 @@ void Notary::NotarizePaymentPlan(Nym& theNym, Account& theDepositorAccount,
         Item::CreateItemFromTransaction(tranOut, Item::atTransactionStatement);
     pResponseBalanceItem->SetStatus(Item::rejection); // the default.
     tranOut.AddItem(*pResponseBalanceItem); // the Transaction's destructor will
-                                            // cleanup the item. It "owns" it
-                                            // now.
+                                            // cleanup the item. It "owns" it now.
     if ((nullptr != pItem) &&
         (false == NYM_IS_ALLOWED(strNymID.Get(),
-                                 ServerSettings::__transact_payment_plan))) {
+                                 ServerSettings::__transact_payment_plan)))
+    {
         Log::vOutput(0, "%s: User %s cannot do this transaction (All payment "
                         "plans are disallowed in server.cfg)\n",
                      __FUNCTION__, strNymID.Get());
@@ -4043,13 +4042,16 @@ void Notary::NotarizePaymentPlan(Nym& theNym, Account& theDepositorAccount,
     // For now, there should only be one of these paymentPlan items inside the
     // transaction.
     // So we treat it that way... I either get it successfully or not.
-    else if ((nullptr == pItem) || (nullptr == pBalanceItem)) {
+    else if ((nullptr == pItem) || (nullptr == pBalanceItem))
+    {
         Log::vError("%s: Error, expected OTItem::paymentPlan and "
                     "OTItem::transactionStatement.\n",
                     __FUNCTION__);
     }
-    else {
-        if (DEPOSITOR_ACCT_ID != pItem->GetPurportedAccountID()) {
+    else
+    {
+        if (DEPOSITOR_ACCT_ID != pItem->GetPurportedAccountID())
+        {
             Log::vOutput(0, "%s: Error: Source account ID on the transaction "
                             "does not match sender's account ID on the "
                             "transaction item.\n",
@@ -4062,14 +4064,13 @@ void Notary::NotarizePaymentPlan(Nym& theNym, Account& theDepositorAccount,
             Log::vOutput(0, "%s: Failed verifying transaction statement.\n",
                          __FUNCTION__);
         }
-        else {
+        else
+        {
             pResponseBalanceItem->SetStatus(
-                Item::acknowledgement); // the transaction agreement was
-                                        // successful.
+                Item::acknowledgement); // the transaction agreement was successful.
 
             // The response item will contain a copy of the request item. So I
-            // save it into a string
-            // here so it can be saved into the "in reference to" field.
+            // save it into a string here so it can be saved into the "in reference to" field.
             pItem->SaveContractRaw(strInReferenceTo);
             pBalanceItem->SaveContractRaw(strBalanceItem);
 
@@ -4078,49 +4079,45 @@ void Notary::NotarizePaymentPlan(Nym& theNym, Account& theDepositorAccount,
             // They're getting SOME sort of response item.
 
             pResponseItem->SetReferenceString(
-                strInReferenceTo); // the response item carries a copy of what
-                                   // it's responding to.
+                strInReferenceTo); // the response item carries a copy of what it's responding to.
             pResponseItem->SetReferenceToNum(
-                pItem->GetTransactionNum()); // This response item is IN
-                                             // RESPONSE to pItem and its Owner
-                                             // Transaction.
+                pItem->GetTransactionNum()); // This response item is IN RESPONSE to pItem and its Owner Transaction.
 
             pResponseBalanceItem->SetReferenceString(
-                strBalanceItem); // the response item carries a copy of what
-                                 // it's responding to.
+                strBalanceItem); // the response item carries a copy of what it's responding to.
             pResponseBalanceItem->SetReferenceToNum(
-                pItem->GetTransactionNum()); // This response item is IN
-                                             // RESPONSE to pItem and its Owner
-                                             // Transaction.
+                pItem->GetTransactionNum()); // This response item is IN RESPONSE to pItem and its Owner Transaction.
 
             // Also load up the Payment Plan from inside the transaction item.
             String strPaymentPlan;
             pItem->GetAttachment(strPaymentPlan);
-            OTPaymentPlan* pPlan = new OTPaymentPlan();
+            OTPaymentPlan* pPlan = new OTPaymentPlan;
             OT_ASSERT(nullptr != pPlan);
 
             // If we failed to load the plan...
-            if ((false == pPlan->LoadContractFromString(strPaymentPlan))) {
+            if ((false == pPlan->LoadContractFromString(strPaymentPlan)))
+            {
                 Log::vError("%s: ERROR loading payment plan from string:\n%s\n",
                             __FUNCTION__, strPaymentPlan.Get());
             }
-            else if (pPlan->GetNotaryID() != NOTARY_ID) {
+            else if (pPlan->GetNotaryID() != NOTARY_ID)
+            {
                 Log::vOutput(0, "%s: ERROR bad server ID on payment plan.\n",
                              __FUNCTION__);
             }
             else if (pPlan->GetInstrumentDefinitionID() !=
-                       theDepositorAccount.GetInstrumentDefinitionID()) {
-                const String strInstrumentDefinitionID1(
-                    pPlan->GetInstrumentDefinitionID()),
-                    strInstrumentDefinitionID2(
-                        theDepositorAccount.GetInstrumentDefinitionID());
+                       theDepositorAccount.GetInstrumentDefinitionID())
+            {
+                const String strInstrumentDefinitionID1(pPlan->GetInstrumentDefinitionID()),
+                             strInstrumentDefinitionID2(theDepositorAccount.GetInstrumentDefinitionID());
                 Log::vOutput(0,
                              "%s: ERROR wrong Instrument Definition ID (%s) on "
                              "payment plan. Expected: %s\n",
                              __FUNCTION__, strInstrumentDefinitionID1.Get(),
                              strInstrumentDefinitionID2.Get());
             }
-            else {
+            else
+            {
                 // CANCELLING? OR ACTIVATING?
                 // If he is cancelling the payment plan (from his outpayments
                 // box, before it's even had a chance
@@ -4131,23 +4128,20 @@ void Notary::NotarizePaymentPlan(Nym& theNym, Account& theDepositorAccount,
                 // be the depositor.
 
                 Identifier theCancelerNymID;
-                const bool bCancelling =
-                    (pPlan->IsCanceled() &&
-                     pPlan->GetCancelerID(theCancelerNymID));
-                const int64_t lExpectedNum =
-                    bCancelling ? 0 : pItem->GetTransactionNum();
+                const bool bCancelling = (pPlan->IsCanceled() && pPlan->GetCancelerID(theCancelerNymID));
+                const int64_t lExpectedNum = bCancelling ? 0 : pItem->GetTransactionNum();
                 const int64_t lFoundNum = pPlan->GetTransactionNum();
+                
                 const Identifier& FOUND_NYM_ID =
                     bCancelling ? pPlan->GetRecipientNymID()
                                 : pPlan->GetSenderNymID();
                 const Identifier& FOUND_ACCT_ID =
                     bCancelling ? pPlan->GetRecipientAcctID()
                                 : pPlan->GetSenderAcctID();
-                const int64_t lFoundOpeningNum =
-                    pPlan->GetOpeningNumber(FOUND_NYM_ID);
-                const int64_t lFoundClosingNum =
-                    pPlan->GetClosingNumber(FOUND_ACCT_ID);
-                if (lFoundNum != lExpectedNum) {
+                const int64_t lFoundOpeningNum = pPlan->GetOpeningNumber(FOUND_NYM_ID);
+                const int64_t lFoundClosingNum = pPlan->GetClosingNumber(FOUND_ACCT_ID);
+                if (lFoundNum != lExpectedNum)
+                {
                     Log::vOutput(
                         0, "%s: ERROR bad main transaction number "
                            "while %s payment plan (%" PRId64 "). Expected "
@@ -4205,59 +4199,47 @@ void Notary::NotarizePaymentPlan(Nym& theNym, Account& theDepositorAccount,
                                                           // on theNym.
                 { // We don't check opening number here, since
                     // NotarizeTransaction already did.
-                    Log::vOutput(0, "%s: ERROR: the Closing number %" PRId64 " "
-                                    "wasn't available for use while "
-                                    "activating a payment plan.\n",
-                                 __FUNCTION__, lFoundClosingNum);
+                    Log::vOutput(0, "%s: ERROR: the Closing number %" PRId64 " wasn't available for use while "
+                                    "activating a payment plan.\n", __FUNCTION__, lFoundClosingNum);
                 }
                 else if (bCancelling && // If cancelling and:
-                           ((pPlan->GetRecipientCountClosingNumbers() < 2) ||
-                            !server_->transactor_.verifyTransactionNumber(
-                                theNym, lFoundClosingNum))) {
-                    Log::vOutput(0, "%s: ERROR: the Closing number wasn't "
-                                    "available for use while cancelling a "
-                                    "payment plan.\n",
-                                 __FUNCTION__);
+                         ((pPlan->GetRecipientCountClosingNumbers() < 2) ||
+                          !server_->transactor_.verifyTransactionNumber(theNym, lFoundClosingNum)))
+                {
+                    Log::vOutput(0, "%s: ERROR: the Closing number wasn't available for use while cancelling a "
+                                    "payment plan.\n", __FUNCTION__);
                 }
                 else // The plan is good (so far.)
                 {
                     // The RECIPIENT_ACCT_ID is the ID on the "To" Account.
                     // (When doing a transfer, normally 2nd acct is the Payee.)
-                    const Identifier RECIPIENT_ACCT_ID(
-                        pPlan->GetRecipientAcctID()),
-                        RECIPIENT_NYM_ID(pPlan->GetRecipientNymID());
+                    const Identifier RECIPIENT_ACCT_ID(pPlan->GetRecipientAcctID()),
+                                     RECIPIENT_NYM_ID (pPlan->GetRecipientNymID());
 
-                    bool bRecipientNymIsServerNym =
-                        ((RECIPIENT_NYM_ID == NOTARY_NYM_ID) ? true : false);
-                    bool bUsersAreSameNym =
-                        ((DEPOSITOR_NYM_ID == RECIPIENT_NYM_ID) ? true : false);
+                    bool bRecipientNymIsServerNym = ((RECIPIENT_NYM_ID == NOTARY_NYM_ID)    ? true : false);
+                    bool bUsersAreSameNym         = ((DEPOSITOR_NYM_ID == RECIPIENT_NYM_ID) ? true : false);
 
-                    Nym theRecipientNym; // We'll probably use this, but
-                                         // maybe not. So I use a
-                                         // pointer that will maybe
-                                         // point here.
-                    Nym* pRecipientNym = nullptr; // Here's the pointer.
-                                                  // (Logic explained
-                                                  // directly below.)
-                    // Set pRecipientNym to point to the right one so we can use
-                    // it below. (Do NOT use theRecipientNym,
-                    // since it won't always point to that one.)
+                    Nym theRecipientNym; // We'll probably use this, but maybe not. So I use a pointer
+                                         // that will maybe point here.
+                    Nym* pRecipientNym = nullptr; // Here's the pointer. (Logic explained directly below.)
+                    
+                    // Set pRecipientNym to point to the right one so we can use it below.
+                    // (Do NOT use theRecipientNym, since it won't always point to that one.)
 
                     bool bFoundRecipientNym = false;
 
                     // Find out if Recipient Nym is also the Server Nym...
-                    if (bRecipientNymIsServerNym) {
-                        // If the Recipient Nym is the server, then just point
-                        // to that.
+                    if (bRecipientNymIsServerNym)
+                    {
+                        // If the Recipient Nym is the server, then just point to that.
                         pRecipientNym = &server_->m_nymServer;
                         bFoundRecipientNym = true;
 
-                        // (No need to verify Nym here since already done in
-                        // this case.)
+                        // (No need to verify Nym here since already done in this case.)
                     }
                     else if (bUsersAreSameNym) // Else if the participants are
-                                                 // the same Nym, point to the
-                                                 // one we already loaded.
+                                               // the same Nym, point to the
+                                               // one we already loaded.
                     {
                         pRecipientNym = &theNym;
                         bFoundRecipientNym = true;
@@ -4265,64 +4247,50 @@ void Notary::NotarizePaymentPlan(Nym& theNym, Account& theDepositorAccount,
                         // (No need to verify Nym here since already done in
                         // this case, before we even got here.)
                     }
-                    else // Otherwise load the Recipient Nym from Disk and
-                           // point to that.
+                    else // Otherwise load the Recipient Nym from Disk and point to that.
                     {
                         theRecipientNym.SetIdentifier(RECIPIENT_NYM_ID);
 
                         bool bLoadedNym =
-                            theRecipientNym.LoadPublicKey(); // Old style
-                                                             // (deprecated.)
-                                                             // NOTE:
-                                                             // LoadCredentials
-                                                             // is already
-                                                             // called inside
-                                                             // LoadPublicKey,
-                                                             // at the top, but
-                                                             // eventually we'll
-                                                             // be calling it
-                                                             // here directly,
-                                                             // once
-                                                             // LoadPublicKey is
-                                                             // removed.
+                            theRecipientNym.LoadPublicKey(); // Old style (deprecated.)
+                                                             // NOTE: LoadCredentials is already called inside LoadPublicKey, at the top, but
+                                                             // eventually we'll be calling it here directly, once LoadPublicKey is removed.
 
-                        if (!bLoadedNym) {
+                        if (!bLoadedNym)
+                        {
                             String strNymID(RECIPIENT_NYM_ID);
-                            Log::vError("%s: Failure loading Recipient Nym "
-                                        "public key: %s\n",
+                            Log::vError("%s: Failure loading Recipient Nym public key: %s\n",
                                         __FUNCTION__, strNymID.Get());
                             bFoundRecipientNym = false;
                         }
                         else if (!theRecipientNym.VerifyPseudonym() ||
-                                   !theRecipientNym.LoadSignedNymfile(
-                                       server_->m_nymServer)) {
+                                 !theRecipientNym.LoadSignedNymfile(server_->m_nymServer))
+                        {
                             String strNymID(RECIPIENT_NYM_ID);
-                            Log::vError("%s: Failure loading or verifying "
-                                        "Recipient Nym public key: %s\n",
+                            Log::vError("%s: Failure loading or verifying Recipient Nym public key: %s\n",
                                         __FUNCTION__, strNymID.Get());
                             bFoundRecipientNym = false;
                         }
-                        else {
+                        else
+                        {
                             pRecipientNym = &theRecipientNym; //  <=====
                             bFoundRecipientNym = true;
                         }
                     }
-                    // Below this point, ALWAYS use pRecipientNym, NOT
-                    // theRecipientNym.
-                    // pRecipientNym is always guaranteed below here to point to
-                    // the right one.
-                    if (!bFoundRecipientNym || (nullptr == pRecipientNym)) {
+                    // Below this point, ALWAYS use pRecipientNym, NOT theRecipientNym.
+                    // pRecipientNym is always guaranteed below here to point to the right
+                    // one.
+                    if (!bFoundRecipientNym || (nullptr == pRecipientNym))
+                    {
                         // (No need to log here; already logged right above.)
                         // OTLog::vOutput("Unable to load or verify Recipient
                         // Nym.()", __FUNCTION__);
                     }
 
-                    // Below this point, we know for sure that the Recipient Nym
-                    // is loaded and verified, and we know
-                    // that if the Server or Sender is actually the Recipient,
-                    // that the pRecipientNym pointer will
-                    // always point to the right one, and no files can be
-                    // overwritten. *phew*
+                    // Below this point, we know for sure that the Recipient Nym is loaded
+                    // and verified, and we know that if the Server or Sender is actually
+                    // the Recipient, that the pRecipientNym pointer will always point to
+                    // the right one, and no files can be overwritten. *phew*
 
                     // You CAN have both accounts owned by the same Nym, but you
                     // CANNOT have them both actually be the SAME ACCT.
@@ -4330,8 +4298,7 @@ void Notary::NotarizePaymentPlan(Nym& theNym, Account& theDepositorAccount,
                                               RECIPIENT_ACCT_ID)) // ACTIVATING
                     {
                         Log::vOutput(
-                            0, "%s: Error: Source account ID matches Recipient "
-                               "account ID "
+                            0, "%s: Error: Source account ID matches Recipient account ID "
                                "on attempted Payment Plan notarization.\n",
                             __FUNCTION__);
                     }
@@ -4340,78 +4307,68 @@ void Notary::NotarizePaymentPlan(Nym& theNym, Account& theDepositorAccount,
                                              RECIPIENT_ACCT_ID)) // CANCELLING
                     {
                         Log::vOutput(
-                            0, "%s: Error: Source account ID doesn't match "
-                               "Recipient account ID "
+                            0, "%s: Error: Source account ID doesn't match Recipient account ID "
                                "on attempted Payment Plan cancellation.\n",
                             __FUNCTION__);
                     }
                     else if (!bCancelling &&
-                               !pPlan->VerifyAgreement(*pRecipientNym,
-                                                       theNym)) // ACTIVATING
+                             !pPlan->VerifyAgreement(*pRecipientNym,
+                                                     theNym)) // ACTIVATING
                     {
                         Log::vOutput(
-                            0, "%s: ERROR verifying Sender and Recipient on "
-                               "Payment Plan "
+                            0, "%s: ERROR verifying Sender and Recipient on Payment Plan "
                                "(against merchant and customer copies.)\n",
                             __FUNCTION__);
                     }
                     // This is now done above, in VerifyAgreement().
                     // We only have it here now in cases of cancellation (where
                     // VerifyAgreement isn't called.)
-                    //                                                                        //
                     // CANCELING
                     else if (bCancelling &&
                              !pPlan->VerifySignature(*pRecipientNym)) {
                         Log::Output(0, "ERROR verifying Recipient's "
                                        "signature on Payment Plan.\n");
                     }
-                    else {
-                        // Verify that BOTH of the Recipient's transaction
-                        // numbers
-                        // (opening and closing) are available for use.
+                    else
+                    {
+                        // Verify that BOTH of the Recipient's transaction numbers (opening and
+                        // closing) are available for use.
                         //
-                        // These three blocks are only checked if we are
-                        // activating, not cancelling.
-                        // Why? Because if we're canceling, then we ALREADY
-                        // checked these things above.
-                        // But if we're activating, that means we checked the
-                        // sender above only, and
-                        // thus we still need to check the recipient.
+                        // These three blocks are only checked if we are activating, not
+                        // cancelling. Why? Because if we're canceling, then we ALREADY checked
+                        // these things above. But if we're activating, that means we checked
+                        // the sender above only, and thus we still need to check the recipient.
                         //
                         if (!bCancelling &&
-                            pPlan->GetRecipientCountClosingNumbers() < 2) {
-                            Log::vOutput(0, "%s: ERROR verifying Recipient's "
-                                            "Opening and Closing number on a "
-                                            "Payment Plan "
-                                            "(he should have two numbers, "
-                                            "but he doesn't.)\n",
+                            pPlan->GetRecipientCountClosingNumbers() < 2)
+                        {
+                            Log::vOutput(0, "%s: ERROR verifying Recipient's Opening and Closing number on a "
+                                            "Payment Plan (he should have two numbers, but he doesn't.)\n",
                                          __FUNCTION__);
                         }
                         else if (!bCancelling &&
-                                   !server_->transactor_
-                                        .verifyTransactionNumber(
+                                 !server_->transactor_.verifyTransactionNumber(
                                             *pRecipientNym,
-                                            pPlan->GetRecipientOpeningNum())) {
-                            Log::vOutput(0, "%s: ERROR verifying Recipient's "
-                                            "opening transaction number on a "
-                                            "payment plan.\n",
+                                            pPlan->GetRecipientOpeningNum()))
+                        {
+                            Log::vOutput(0, "%s: ERROR verifying Recipient's opening transaction number on a payment plan.\n",
                                          __FUNCTION__);
                         }
                         else if (!bCancelling &&
-                                   !server_->transactor_
-                                        .verifyTransactionNumber(
-                                            *pRecipientNym,
-                                            pPlan->GetRecipientClosingNum())) {
-                            Log::vOutput(0, "%s: ERROR verifying Recipient's "
-                                            "Closing transaction number on a "
-                                            "Payment Plan.\n",
+                                 !server_->transactor_.verifyTransactionNumber(
+                                           *pRecipientNym,
+                                           pPlan->GetRecipientClosingNum()))
+                        {
+                            Log::vOutput(0, "%s: ERROR verifying Recipient's Closing transaction number on a Payment Plan.\n",
                                          __FUNCTION__);
                         }
-                        else {
+                        else
+                        {
                             // Load up the recipient ACCOUNT and validate it.
                             //
-                            Account* pRecipientAcct = nullptr;
+                            Account * pRecipientAcct = nullptr;
                             std::unique_ptr<Account> theRecipientAcctGuardian;
+                            
                             if (!bCancelling) // ACTIVATING
                             {
                                 pRecipientAcct = Account::LoadExistingAccount(
@@ -4423,103 +4380,75 @@ void Notary::NotarizePaymentPlan(Nym& theNym, Account& theDepositorAccount,
                                 pRecipientAcct = &theDepositorAccount;
                             }
                             //
-                            if (nullptr == pRecipientAcct) {
+                            if (nullptr == pRecipientAcct)
+                            {
                                 Log::vOutput(
                                     0, "%s: ERROR loading Recipient account.\n",
                                     __FUNCTION__);
                             }
-                            else if (!pRecipientAcct->VerifyOwner(
-                                           *pRecipientNym)) {
-                                Log::vOutput(0, "%s: ERROR verifying "
-                                                "ownership of the recipient "
-                                                "account.\n",
+                            else if (!pRecipientAcct->VerifyOwner(*pRecipientNym))
+                            {
+                                Log::vOutput(0, "%s: ERROR verifying ownership of the recipient account.\n",
                                              __FUNCTION__);
                             }
-                            else if (pRecipientAcct->IsInternalServerAcct()) {
-                                Log::vOutput(
-                                    0,
-                                    "%s: Failed: recipient account is an "
-                                    "internal "
-                                    "server account (currently prohibited.)\n",
+                            else if (pRecipientAcct->IsInternalServerAcct())
+                            {
+                                Log::vOutput(0,
+                                    "%s: Failed: recipient account is an internal server account (currently prohibited.)\n",
                                     __FUNCTION__);
                             }
                             // Are both of the accounts of the same Asset Type?
                             // VERY IMPORTANT!!
-                            else if (pRecipientAcct
-                                         ->GetInstrumentDefinitionID() !=
-                                     theDepositorAccount
-                                         .GetInstrumentDefinitionID()) {
-                                String strSourceInstrumentDefinitionID(
-                                    theDepositorAccount
-                                        .GetInstrumentDefinitionID()),
-                                    strRecipInstrumentDefinitionID(
-                                        pRecipientAcct
-                                            ->GetInstrumentDefinitionID());
+                            else if (pRecipientAcct->GetInstrumentDefinitionID() !=
+                                     theDepositorAccount.GetInstrumentDefinitionID())
+                            {
+                                String strSourceInstrumentDefinitionID(theDepositorAccount.GetInstrumentDefinitionID()),
+                                       strRecipInstrumentDefinitionID(pRecipientAcct->GetInstrumentDefinitionID());
                                 Log::vOutput(
-                                    0, "%s: ERROR - user attempted to %s a "
-                                       "payment plan between dissimilar "
-                                       "instrument definitions:\n%s\n%s\n",
+                                    0, "%s: ERROR - user attempted to %s a payment plan between dissimilar instrument definitions:\n%s\n%s\n",
                                     __FUNCTION__,
                                     bCancelling ? "cancel" : "activate",
                                     strSourceInstrumentDefinitionID.Get(),
                                     strRecipInstrumentDefinitionID.Get());
                             }
-                            // Does it verify?
-                            // I call VerifySignature here since
-                            // VerifyContractID was already called in
-                            // LoadExistingAccount().
-                            else if (!pRecipientAcct->VerifySignature(
-                                         server_->m_nymServer)) {
-                                Log::vOutput(0, "%s: ERROR verifying "
-                                                "signature on the Recipient "
-                                                "account.\n",
+                            // Does it verify? I call VerifySignature here since VerifyContractID
+                            // was already called in LoadExistingAccount().
+                            else if (!pRecipientAcct->VerifySignature(server_->m_nymServer))
+                            {
+                                Log::vOutput(0, "%s: ERROR verifying signature on the Recipient account.\n",
                                              __FUNCTION__);
                             }
-                            // This one is superfluous, but I'm leaving it.
-                            // (pPlan and pRecip are both already
-                            // matches to a 3rd value: source acct instrument
-                            // definition
-                            // ID.)
-                            else if (pRecipientAcct
-                                         ->GetInstrumentDefinitionID() !=
-                                     pPlan->GetInstrumentDefinitionID()) {
-                                const String strInstrumentDefinitionID1(
-                                    pPlan->GetInstrumentDefinitionID()),
-                                    strInstrumentDefinitionID2(
-                                        pRecipientAcct
-                                            ->GetInstrumentDefinitionID());
-                                Log::vOutput(0, "%s: ERROR wrong Asset Type "
-                                                "ID (%s) on Recipient Acct. "
-                                                "Expected per Plan: %s\n",
+                            // This one is superfluous, but I'm leaving it. (pPlan and pRecip are
+                            // both already matches to a 3rd value: source acct instrument
+                            // definition ID.)
+                            else if (pRecipientAcct->GetInstrumentDefinitionID() != pPlan->GetInstrumentDefinitionID())
+                            {
+                                const String strInstrumentDefinitionID1(pPlan->GetInstrumentDefinitionID()),
+                                             strInstrumentDefinitionID2(pRecipientAcct->GetInstrumentDefinitionID());
+                                Log::vOutput(0, "%s: ERROR wrong Asset Type ID (%s) on Recipient Acct. Expected per Plan: %s\n",
                                              __FUNCTION__,
                                              strInstrumentDefinitionID2.Get(),
                                              strInstrumentDefinitionID1.Get());
                             }
-                            // At this point I feel pretty confident that the
-                            // Payment Plan is a valid request from both
-                            // parties.
-                            // I have both users AND both accounts and validated
-                            // against the Payment Plan, signatures and all.
-                            // The only other possibility is that the merchant
-                            // is canceling the payment plan before the customer
-                            // had a chance to confirm/activate it.
-                            else {
+                            // At this point I feel pretty confident that the Payment Plan is a
+                            // valid request from both parties. I have both users AND both accounts
+                            // and validated against the Payment Plan, signatures and all. The only
+                            // other possibility is that the merchant is canceling the payment plan
+                            // before the customer had a chance to confirm/activate it.
+                            else
+                            {
                                 // If activating, add it to Cron...
                                 //
-                                // We add the payment plan to the server's Cron
-                                // object, which does regular processing.
-                                // That object will take care of processing the
+                                // We add the payment plan to the server's Cron object, which does
+                                // regular processing. That object will take care of processing the
                                 // payment plan according to its terms.
                                 //
-                                // NOTE: FYI, inside AddCronItem, since this is
-                                // a new CronItem, a Cron Receipt will
-                                // be saved with the User's signature on it,
-                                // containing the Cron Item from the user's
-                                // original request. After that, the item is
-                                // stored internally to Cron itself, and
-                                // signed by the server--and changes over time
-                                // as cron processes. (The original receipt
-                                // can always be loaded when necessary.)
+                                // NOTE: FYI, inside AddCronItem, since this is a new CronItem, a Cron
+                                // Receipt will be saved with the User's signature on it, containing the
+                                // Cron Item from the user's original request. After that, the item is
+                                // stored internally to Cron itself, and signed by the server--and
+                                // changes over time as cron processes. (The original receipt can always
+                                // be loaded when necessary.)
                                 //
                                 if (!bCancelling &&
                                     server_->m_Cron.AddCronItem(
@@ -4529,183 +4458,124 @@ void Notary::NotarizePaymentPlan(Nym& theNym, Account& theDepositorAccount,
                                     // todo need to be able to "roll back" if
                                     // anything inside this block fails.
 
-                                    // Now we can set the response item as an
-                                    // acknowledgement instead of the default
-                                    // (rejection)
-                                    pResponseItem->SetStatus(
-                                        Item::acknowledgement);
+                                    // Now we can set the response item as an acknowledgement instead of the
+                                    // default (rejection)
+                                    pResponseItem->SetStatus(Item::acknowledgement);
 
-                                    bOutSuccess = true; // The payment plan
-                                                        // activation was
-                                                        // successful.
+                                    bOutSuccess = true; // The payment plan activation was successful.
 
-                                    Log::vOutput(2, "%s: Successfully added "
-                                                    "payment plan to Cron "
-                                                    "object.\n",
+                                    Log::vOutput(2, "%s: Successfully added payment plan to Cron object.\n",
                                                  __FUNCTION__);
 
-                                    // Server side, the Nym stores a list of all
-                                    // open cron item numbers.
-                                    // (So we know if there is still stuff open
-                                    // on Cron for that Nym, and we know what it
-                                    // is.)
+                                    // Server side, the Nym stores a list of all open cron item numbers. (So
+                                    // we know if there is still stuff open on Cron for that Nym, and we
+                                    // know what it is.)
                                     //
-                                    std::set<int64_t>& theIDSet =
-                                        theNym.GetSetOpenCronItems();
+                                    std::set<int64_t>& theIDSet = theNym.GetSetOpenCronItems();
                                     theIDSet.insert(pPlan->GetTransactionNum());
                                     theIDSet.insert(pPlan->GetClosingNum());
                                     // // saved below
 
-                                    // This just marks the Closing number so I
-                                    // can't USE it again. (Since I'm using it
-                                    // as the closing
-                                    // number for this cron item now.) I'm still
-                                    // RESPONSIBLE for the number until
-                                    // RemoveIssuedNumber()
-                                    // is called. If we didn't call this here,
-                                    // then I could come back later and USE THE
-                                    // NUMBER AGAIN!
-                                    // (Bad!)
-                                    // server_->transactor_.removeTransactionNumber
-                                    // was
-                                    // already
-                                    // called for tranIn->GetTransactionNum()
-                                    // (That's the opening number.)
+                                    // This just marks the Closing number so I can't USE it again. (Since
+                                    // I'm using it as the closing number for this cron item now.) I'm still
+                                    // RESPONSIBLE for the number until RemoveIssuedNumber() is called. If
+                                    // we didn't call this here, then I could come back later and USE THE
+                                    // NUMBER AGAIN! (Bad!) server_->transactor_.removeTransactionNumber was
+                                    // already called for tranIn->GetTransactionNum() (That's the opening
+                                    // number.)
                                     //
                                     // Here's the closing number:
-                                    server_->transactor_
-                                        .removeTransactionNumber(
+                                    server_->transactor_.removeTransactionNumber(
                                             theNym, pPlan->GetClosingNum(),
                                             true); // bSave=true
-                                    // RemoveIssuedNum will be called for that
-                                    // original transaction number when the
-                                    // finalReceipt is created.
-                                    // RemoveIssuedNum will be called for the
-                                    // Closing number when the finalReceipt is
-                                    // accepted.
+                                    // RemoveIssuedNum will be called for that original transaction number
+                                    // when the finalReceipt is created. RemoveIssuedNum will be called for
+                                    // the Closing number when the finalReceipt is accepted.
 
-                                    std::set<int64_t>& theIDSet2 =
-                                        pRecipientNym->GetSetOpenCronItems();
-                                    theIDSet2.insert(
-                                        pPlan->GetRecipientOpeningNum());
-                                    theIDSet2.insert(
-                                        pPlan->GetRecipientClosingNum());
-                                    // // saved below
+                                    std::set<int64_t>& theIDSet2 = pRecipientNym->GetSetOpenCronItems();
+                                    theIDSet2.insert(pPlan->GetRecipientOpeningNum());
+                                    theIDSet2.insert(pPlan->GetRecipientClosingNum());
+                                    // saved below
 
-                                    // For recipient, I also remove the opening
-                                    // and closing numbers as AVAILABLE FOR USE.
-                                    // But they aren't removed as ISSUED until
-                                    // later...
-                                    // RemoveIssuedNum is called for the
-                                    // Recipient's opening number
-                                    // onFinalReceipt,
-                                    // and it's called for the Recipient's
-                                    // closing number when that final receipt is
-                                    // closed out.
-                                    server_->transactor_
-                                        .removeTransactionNumber(
+                                    // For recipient, I also remove the opening and closing numbers as
+                                    // AVAILABLE FOR USE. But they aren't removed as ISSUED until later...
+                                    // RemoveIssuedNum is called for the Recipient's opening number
+                                    // onFinalReceipt, and it's called for the Recipient's closing number
+                                    // when that final receipt is closed out.
+                                    server_->transactor_.removeTransactionNumber(
                                             *pRecipientNym,
                                             pPlan->GetRecipientOpeningNum(),
                                             false); // bSave=true
-                                    server_->transactor_
-                                        .removeTransactionNumber(
+                                    server_->transactor_.removeTransactionNumber(
                                             *pRecipientNym,
                                             pPlan->GetRecipientClosingNum(),
                                             true); // bSave=true
 
-                                    // Send success notice to other parties.
-                                    // (So they can deal with their payments
-                                    // inbox and outpayments box,
-                                    // where pending copies of the instrument
-                                    // may still be waiting.)
+                                    // Send success notice to other parties. (So they can deal with their payments
+                                    // inbox and outpayments box, where pending copies of the instrument may still
+                                    // be waiting.)
                                     //
                                     int64_t lOtherNewTransNumber = 0;
-                                    server_->transactor_
-                                        .issueNextTransactionNumber(
-                                            lOtherNewTransNumber);
+                                    server_->transactor_.issueNextTransactionNumber(lOtherNewTransNumber);
 
                                     if (false ==
                                         pPlan->SendNoticeToAllParties(
                                             true, // bSuccessMsg=true
                                             server_->m_nymServer, NOTARY_ID,
                                             lOtherNewTransNumber,
-                                            // // Each party has its own opening
-                                            // number. Handled internally.
-                                            strPaymentPlan, nullptr, nullptr,
-                                            &theNym)) {
+                                            // Each party has its own opening number. Handled internally.
+                                            strPaymentPlan, &strPaymentPlan, nullptr,
+                                            &theNym))
+                                    {
                                         Log::vOutput(
-                                            0, "%s: Failed notifying parties "
-                                               "while trying to activate "
-                                               "payment plan: %" PRId64 ".\n",
-                                            __FUNCTION__,
-                                            pPlan->GetOpeningNum());
+                                            0, "%s: Failed notifying parties while trying to activate payment plan: %" PRId64 ".\n",
+                                            __FUNCTION__, pPlan->GetOpeningNum());
                                     }
                                 }
-                                else {
-                                    if (bCancelling) {
+                                else
+                                {
+                                    if (bCancelling)
+                                    {
                                         tranOut.SetAsCancelled();
 
                                         Log::vOutput(
-                                            0, "%s: Canceling a payment plan "
-                                               "before it was ever activated. "
-                                               "(At user's request.)\n",
+                                            0, "%s: Canceling a payment plan before it was ever activated. (At user's request.)\n",
                                             __FUNCTION__);
                                     }
                                     else
                                         Log::vOutput(
-                                            0, "%s: Unable to add payment plan "
-                                               "to Cron. (Failed activating "
-                                               "payment plan.)\n",
+                                            0, "%s: Unable to add payment plan to Cron. (Failed activating payment plan.)\n",
                                             __FUNCTION__);
 
-                                    // Send a failure notice to the other
-                                    // parties.
+                                    // Send a failure notice to the other parties.
                                     //
-                                    // DROP REJECTION NOTICE HERE TO ALL
-                                    // PARTIES....
-                                    // SO THEY CAN CLAW BACK THEIR TRANSACTION
-                                    // #s....
+                                    // DROP REJECTION NOTICE HERE TO ALL PARTIES....
+                                    // SO THEY CAN CLAW BACK THEIR TRANSACTION #s....
                                     //
                                     int64_t lOtherNewTransNumber = 0;
-                                    server_->transactor_
-                                        .issueNextTransactionNumber(
-                                            lOtherNewTransNumber);
+                                    server_->transactor_.issueNextTransactionNumber(lOtherNewTransNumber);
 
-                                    if (false ==
-                                        pPlan->SendNoticeToAllParties(
+                                    if (false == pPlan->SendNoticeToAllParties(
                                             false, server_->m_nymServer,
                                             NOTARY_ID, lOtherNewTransNumber,
-                                            // // Each party has its own opening
-                                            // number. Handled internally.
-                                            strPaymentPlan, nullptr, nullptr,
+                                            // Each party has its own opening number. Handled internally.
+                                            strPaymentPlan, &strPaymentPlan, nullptr,
                                             &theNym)) {
-                                        // NOTE: A party may deliberately try to
-                                        // activate a payment plan without
-                                        // signing it.
-                                        // (As a way of rejecting it.) This will
-                                        // cause rejection notices to go to all
-                                        // the other
-                                        // parties, allowing them to harvest
-                                        // back their closing numbers.
-                                        // Since that is expected to happen,
-                                        // that means if you have 2 parties, and
-                                        // the 2nd one
-                                        // "activates" it (without signing),
-                                        // then this piece of code here will
-                                        // DEFINITELY fail to
-                                        // send the rejection notice to the
-                                        // first party (since the 2nd one hadn't
-                                        // even signed the
-                                        // thing yet.)
-                                        //
-                                        // (Since we expect that to normally
-                                        // happen, we don't log an error here.)
+                                            // NOTE: A party may deliberately try to activate a payment plan without
+                                            // signing it. (As a way of rejecting it.) This will cause rejection
+                                            // notices to go to all the other parties, allowing them to harvest back
+                                            // their closing numbers. Since that is expected to happen, that means
+                                            // if you have 2 parties, and the 2nd one "activates" it (without
+                                            // signing), then this piece of code here will DEFINITELY fail to send
+                                            // the rejection notice to the first party (since the 2nd one hadn't
+                                            // even signed the thing yet.)
+                                            //
+                                            // (Since we expect that to normally happen, we don't log an error here.)
 
-                                        //                                  OTLog::vOutput(0,
+//                                  OTLog::vOutput(0,
                                         // "%s: Failed notifying all parties
                                         // about failed activation of payment
-                                        // plan: %ld.\n",
-                                        //                                                 __FUNCTION__,
+                                        // plan: %ld.\n", __FUNCTION__,
                                         // pPlan->GetTransactionNum());
                                     }
                                 } // Failure adding Cron Item.
@@ -4713,32 +4583,31 @@ void Notary::NotarizePaymentPlan(Nym& theNym, Account& theDepositorAccount,
                         }
                     } // If recipient Nym successfully loaded from storage.
                 } // If Payment Plan successfully loaded from Transaction Item.
-            }     // else
+            } // else
 
-            // If the payment plan WAS successfully added to Cron, then we don't
-            // need to
-            // delete it here, since Cron owns it now, and will deal with
-            // cleaning it up at the right time.
+            // If the payment plan WAS successfully added to Cron, then we don't need to
+            // delete it here, since Cron owns it now, and will deal with cleaning it up
+            // at the right time.
+            //
             if ((nullptr != pPlan) &&
-                (pResponseItem->GetStatus() != Item::acknowledgement)) {
+                (pResponseItem->GetStatus() != Item::acknowledgement))
+            {
                 delete pPlan;
                 pPlan = nullptr;
             }
         }
     }
 
-    // sign the response item before sending it back (it's already been added to
-    // the transaction above)
-    // Now, whether it was rejection or acknowledgement, it is set properly and
-    // it is signed, and it
+    // sign the response item before sending it back (it's already been added to the transaction above)
+    // Now, whether it was rejection or acknowledgement, it is set properly and it is signed, and it
     // is owned by the transaction, who will take it from here.
     pResponseItem->SignContract(server_->m_nymServer);
-    pResponseItem->SaveContract(); // the signing was of no effect because I
-                                   // forgot to save.
+    pResponseItem->SaveContract(); // the signing was of no effect because I forgot to save.
 
     pResponseBalanceItem->SignContract(server_->m_nymServer);
     pResponseBalanceItem->SaveContract();
 }
+
 
 void Notary::NotarizeSmartContract(Nym& theNym, Account& theActivatingAccount,
                                    OTTransaction& tranIn,

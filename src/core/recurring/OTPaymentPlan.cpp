@@ -694,18 +694,14 @@ bool OTPaymentPlan::ProcessPayment(const int64_t& lAmount)
         }
     }
 
-    // Now that I have the original Payment Plan loaded, and all the Nyms ready
-    // to go,
-    // let's make sure that BOTH the nyms in question have SIGNED the original
-    // request.
-    // (Their signatures wouldn't be on the updated version in Cron--the server
-    // signs
-    // that one.)
+    // Now that I have the original Payment Plan loaded, and all the Nyms
+    // ready to go, let's make sure that BOTH the nyms in question have
+    // SIGNED the original request. (Their signatures wouldn't be on the
+    // updated version in Cron--the server signs that one.)
 
     if (!pOrigCronItem->VerifySignature(*pSenderNym) ||
         !pOrigCronItem->VerifySignature(*pRecipientNym)) {
-        otErr << "Failed authorization: Payment plan (while attempting to "
-                 "process...)\n";
+        otErr << "Failed authorization: Payment plan (while attempting to process...)\n";
         FlagForRemoval(); // Remove it from Cron.
         return false;
     }

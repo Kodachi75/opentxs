@@ -561,7 +561,13 @@ bool CredentialSet::LoadChildKeyCredential(const String& strSubID)
 bool CredentialSet::LoadChildKeyCredential(const proto::Credential& serializedCred)
 {
 
-    bool validProto = proto::Verify(serializedCred, proto::CREDROLE_ERROR, true);
+    bool validProto = proto::Check<proto::Credential>(
+        serializedCred,
+        0,
+        0xFFFFFFFF,
+        proto::CREDROLE_ERROR,
+        true);
+
     if (!validProto) {
         otErr << __FUNCTION__ << ": Invalid serialized child key credential.\n";
         return false;

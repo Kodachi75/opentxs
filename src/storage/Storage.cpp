@@ -292,7 +292,9 @@ bool Storage::UpdateNymCreds(const std::string& id, const std::string& hash)
         item->set_itemid(id);
         item->set_hash(hash);
 
-        assert(Verify(*nym));
+        if (!proto::Check<proto::StorageNym>(*nym, 0, 0xFFFFFFFF)) {
+            abort();
+        }
 
         if (StoreProto<proto::StorageNym>(*nym)) {
             return UpdateNyms(*nym);
@@ -322,7 +324,9 @@ bool Storage::UpdateCredentials(const std::string& id, const std::string& hash)
         }
         cred_lock_.unlock();
 
-        assert(Verify(credIndex));
+        if (!proto::Check<proto::StorageCredentials>(credIndex, 0, 0xFFFFFFFF)) {
+            abort();
+        }
 
         if (StoreProto<proto::StorageCredentials>(credIndex)) {
             return UpdateItems(credIndex);
@@ -356,7 +360,9 @@ bool Storage::UpdateNyms(const proto::StorageNym& nym)
         }
         nymLock.unlock();
 
-        assert(Verify(nymIndex));
+        if (!proto::Check<proto::StorageNymList>(nymIndex, 0, 0xFFFFFFFF)) {
+            abort();
+        }
 
         if (StoreProto<proto::StorageNymList>(nymIndex)) {
             return UpdateItems(nymIndex);
@@ -386,7 +392,9 @@ bool Storage::UpdateServers(const std::string& id, const std::string& hash)
         }
         serverlock.unlock();
 
-        assert(Verify(serverIndex));
+        if (!proto::Check<proto::StorageServers>(serverIndex, 0, 0xFFFFFFFF)) {
+            abort();
+        }
 
         if (StoreProto<proto::StorageServers>(serverIndex)) {
             return UpdateItems(serverIndex);
@@ -415,7 +423,9 @@ bool Storage::UpdateItems(const proto::StorageCredentials& creds)
 
         items->set_creds(hash);
 
-        if (!Verify(*items)) { std::abort(); }
+        if (!proto::Check<proto::StorageItems>(*items, 0, 0xFFFFFFFF)) {
+            abort();
+        }
 
         if (StoreProto<proto::StorageItems>(*items)) {
             return UpdateRoot(*items);
@@ -444,7 +454,9 @@ bool Storage::UpdateItems(const proto::StorageNymList& nyms)
 
         items->set_nyms(hash);
 
-        assert(Verify(*items));
+        if (!proto::Check<proto::StorageItems>(*items, 0, 0xFFFFFFFF)) {
+            abort();
+        }
 
         if (StoreProto<proto::StorageItems>(*items)) {
             return UpdateRoot(*items);
@@ -473,7 +485,9 @@ bool Storage::UpdateItems(const proto::StorageServers& servers)
 
         items->set_servers(hash);
 
-        assert(Verify(*items));
+        if (!proto::Check<proto::StorageItems>(*items, 0, 0xFFFFFFFF)) {
+            abort();
+        }
 
         if (StoreProto<proto::StorageItems>(*items)) {
             return UpdateRoot(*items);
@@ -508,7 +522,9 @@ bool Storage::UpdateRoot(const proto::StorageItems& items)
         root->set_version(1);
         root->set_items(hash);
 
-        assert(Verify(*root));
+        if (!proto::Check<proto::StorageRoot>(*root, 0, 0xFFFFFFFF)) {
+            abort();
+        }
 
         if (StoreProto<proto::StorageRoot>(*root)) {
             plaintext = ProtoAsString<proto::StorageRoot>(*root);
@@ -537,7 +553,9 @@ bool Storage::UpdateRoot(
         root.set_gc(true);
         root.set_gcroot(gcroot);
 
-        assert(Verify(root));
+        if (!proto::Check<proto::StorageRoot>(root, 0, 0xFFFFFFFF)) {
+            abort();
+        }
 
         if (StoreProto<proto::StorageRoot>(root)) {
             std::string hash;
@@ -566,7 +584,9 @@ bool Storage::UpdateRoot()
         gc_running_.store(false);
         root->set_gc(false);
 
-        assert(Verify(*root));
+        if (!proto::Check<proto::StorageRoot>(*root, 0, 0xFFFFFFFF)) {
+            abort();
+        }
 
         if (StoreProto<proto::StorageRoot>(*root)) {
             std::string hash;
@@ -674,16 +694,16 @@ bool Storage::Load(
             if (LoadProto<proto::CredentialIndex>
                 (credListHash, credList, checking)) {
 
-                return Verify(*credList);
+                return true;
             } else {
                 std::cout << __FUNCTION__ << ": Error: can not load public nym "
                 << id << ". Database is corrupt." << std::endl;
-                assert(false);
+                abort();
             }
         } else {
             std::cout << __FUNCTION__ << ": Error: can not load index object "
             << "for nym " << id << ". Database is corrupt." << std::endl;
-            assert(false);
+            abort();
         }
     }
 
@@ -811,7 +831,7 @@ void Storage::CollectGarbage()
 
         if (!LoadProto<proto::StorageRoot>(old_gc_root_, root)) {
             // If this branch is reached, the data store is corrupted
-            assert(false);
+            abort();
         }
         gcitems = root->items();
         updated = true;

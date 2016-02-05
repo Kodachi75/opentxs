@@ -61,24 +61,24 @@ void OTAgreement::setCustomerNymId(const Identifier& NYM_ID)
 bool OTAgreement::SendNoticeToAllParties(
     bool bSuccessMsg, Nym& theServerNym, const Identifier& theNotaryID,
     const int64_t& lNewTransactionNumber,
-    //                                       const int64_t& lInReferenceTo,
-    // // Each party has its own opening trans #.
+//  const int64_t& lInReferenceTo,
+    // Each party has its own opening trans #.
     const String& strReference, String* pstrNote, String* pstrAttachment,
     Nym* pActualNym) const
 {
-    bool bSuccess =
-        true; // Success is defined as ALL parties receiving a notice
+    bool bSuccess = true; // Success is defined as ALL parties receiving a notice
 
-    Nym theRecipientNym; // Don't use this... use the pointer just
-                         // below.
+    Nym theRecipientNym; // Don't use this... use the pointer just below.
     Nym* pRecipient = nullptr;
 
-    if (theServerNym.CompareID(GetRecipientNymID())) {
+    if (theServerNym.CompareID(GetRecipientNymID()))
+    {
         pRecipient = &theServerNym; // Just in case the recipient Nym is also
                                     // the server Nym.
     }
     else if ((nullptr != pActualNym) &&
-               pActualNym->CompareID(GetRecipientNymID())) {
+        pActualNym->CompareID(GetRecipientNymID()))
+    {
         pRecipient = pActualNym;
     }
 
@@ -179,6 +179,7 @@ bool OTAgreement::SendNoticeToAllParties(
 }
 
 // static
+// Used by payment plans and smart contracts.
 bool OTAgreement::DropServerNoticeToNymbox(
     bool bSuccessMsg, // Nym receives an OTItem::acknowledgment or
                       // OTItem::rejection.
