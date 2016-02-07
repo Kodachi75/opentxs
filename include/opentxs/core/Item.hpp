@@ -239,14 +239,10 @@ public:
     };
 
 protected:
-    // There is the OTTransaction transfer, which is a transaction type, and
-    // there is also
-    // the OTItem transfer, which is an item type. They are related. Every
-    // transaction has
-    // a list of items, and these perform the transaction. A transaction trying
-    // to TRANSFER
-    // would have these items:  transfer, serverfee, balance, and possibly
-    // outboxhash.
+    // There is the OTTransaction transfer, which is a transaction type, and there is also
+    // the OTItem transfer, which is an item type. They are related. Every transaction has
+    // a list of items, and these perform the transaction. A transaction trying to TRANSFER
+    // would have these items:  transfer, serverfee, balance, and possibly outboxhash.
 
     Item(); // <============================= Here for now, if I can get away
             // with it.

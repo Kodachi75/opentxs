@@ -50,7 +50,7 @@ class OTRecordList;
 class OTRecord
 {
 public:
-    enum OTRecordType { Mail = 0, Transfer, Receipt, Instrument, ErrorState };
+    enum OTRecordType { Mail = 0, Transfer, Receipt, Instrument, Notice, ErrorState };
 
 private:
     OTRecordList & backlink_;
@@ -116,9 +116,18 @@ private:
     bool m_bIsExpired;
     bool m_bIsCanceled;
     OTRecordType m_RecordType;
+    
+    bool m_bHasSuccess = false; // Does it even HAVE a "success" state?
+                                // (Incoming cheque, for example, does NOT.)
+    bool m_bIsSuccess  = false; // If it DOES have a "success" state, then
+                                // is it set to a success or a failure?
+    
     bool AcceptIncomingTransferOrReceipt() const;
 
 public:
+    EXPORT void SetSuccess(const bool bIsSuccess);
+    EXPORT bool HasSuccess(bool & bIsSuccess) const;
+    
     EXPORT void SetSpecialMail(bool bIsSpecial = true);
     EXPORT bool IsSpecialMail() const;
     EXPORT bool IsPending() const;
@@ -143,7 +152,7 @@ public:
     EXPORT time64_t GetValidFrom() const;
     EXPORT time64_t GetValidTo() const;
     EXPORT void SetDateRange(time64_t tValidFrom,
-                             time64_t tValidTo); // Todo: convert to time64_t
+                             time64_t tValidTo);
     EXPORT bool CanDeleteRecord() const; // For completed records (not pending.)
     EXPORT bool CanAcceptIncoming() const;  // For incoming, pending
                                             // (not-yet-accepted) instruments.
@@ -155,29 +164,27 @@ public:
                                                 // see if it's been accepted, so
                                                 // this lets you erase the
                                                 // record of sending it.)
-    EXPORT bool CancelOutgoing(std::string str_via_acct) const; // For outgoing,
-                                                                // pending
-    // (not-yet-accepted) instruments.
-    // NOTE: str_via_acct can be blank if a
-    // cheque. But if voucher, smart
-    // contract, payment plan, you must
-    // provide.
+    EXPORT bool CancelOutgoing(std::string str_via_acct) const; // For outgoing, pending
+                                                                // (not-yet-accepted) instruments.
+                                                                // NOTE: str_via_acct can be blank if a
+                                                                // cheque. But if voucher, smart
+                                                                // contract, payment plan, you must
+                                                                // provide.
     EXPORT bool AcceptIncomingInstrument(
         const std::string& str_into_acct) const; // For incoming, pending
-    // (not-yet-accepted) instruments.
-    EXPORT bool AcceptIncomingTransfer() const; // For incoming, pending
-                                                // (not-yet-accepted) transfers.
-    EXPORT bool AcceptIncomingReceipt() const;  // For incoming,
-                                                // (not-yet-accepted)
-                                                // receipts.
-    EXPORT bool DiscardIncoming() const;        // For incoming, pending
-                                                // (not-yet-accepted)
-                                                // instruments.
+                                                 // (not-yet-accepted) instruments.
+    EXPORT bool AcceptIncomingTransfer() const;  // For incoming, pending
+                                                 // (not-yet-accepted) transfers.
+    EXPORT bool AcceptIncomingReceipt() const;   // For incoming,
+                                                 // (not-yet-accepted)
+                                                 // receipts.
+    EXPORT bool DiscardIncoming() const;         // For incoming, pending
+                                                 // (not-yet-accepted)
+                                                 // instruments.
     EXPORT bool DeleteRecord() const; // For completed records (not pending.)
     EXPORT bool DiscardOutgoingCash() const; // For OUTgoing cash. (No way to
-                                             // see if
-    // it's been accepted, so this lets you
-    // erase the record of sending it.)
+                                             // see if it's been accepted, so this lets you
+                                             // erase the record of sending it.)
     EXPORT int32_t GetBoxIndex() const; // If this is set to 3, for example, for
                                         // a payment in the payments inbox, then
                                         // index 3 in that same box refers to

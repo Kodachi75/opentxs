@@ -63,10 +63,8 @@ bool OTRecord::FormatAmount(std::string& str_output) const
         m_str_instrument_definition_id.empty()) // Need these to do the
                                                 // formatting.
     {
-        //      otOut << __FUNCTION__ << ": Unable to format amount. Type: " <<
-        // m_str_type << " Amount:
-        // " << m_str_amount << "  Asset: " << m_str_instrument_definition_id <<
-        // "";
+//      otOut << __FUNCTION__ << ": Unable to format amount. Type: " << m_str_type << " Amount: "
+//            << m_str_amount << "  Asset: " << m_str_instrument_definition_id << "";
         return false;
     }
     str_output = OTAPI_Wrap::It()->FormatAmount(
@@ -95,10 +93,8 @@ bool OTRecord::FormatAmountLocale(std::string& str_output,
         m_str_instrument_definition_id.empty()) // Need these to do the
                                                 // formatting.
     {
-        //      otOut << __FUNCTION__ << ": Unable to format amount. Type: " <<
-        // m_str_type << " Amount:
-        // " << m_str_amount << "  Asset: " << m_str_instrument_definition_id <<
-        // "";
+//      otOut << __FUNCTION__ << ": Unable to format amount. Type: " << m_str_type << " Amount: "
+//            << m_str_amount << "  Asset: " << m_str_instrument_definition_id << "";
         return false;
     }
     str_output = OTAPI_Wrap::It()->FormatAmountLocale(
@@ -191,8 +187,13 @@ bool OTRecord::FormatShortMailDescription(std::string& str_output) const
     str_output = strDescription.Get();
     return (!str_output.empty());
 }
+    
+    
 bool OTRecord::FormatDescription(std::string& str_output) const
 {
+    bool bIsSuccess  = false;
+    const bool bHasSuccess = this->HasSuccess(bIsSuccess);
+    // ----------------------------------------
     String strDescription, strStatus, strKind;
 
     if (IsRecord()) {
@@ -210,9 +211,19 @@ bool OTRecord::FormatDescription(std::string& str_output) const
                                           // may also falsely assume payment
                                           // expired when actually it was sent.)
                                           // Solution is a new box.
+        else if (IsNotice())
+        {
+            if (bHasSuccess)
+            {
+                if (bIsSuccess)
+                    strStatus = "(activated)";
+                else
+                    strStatus = "(failed activating)";
+            }
+        }
         else
             strStatus = "";
-        //          strStatus = "(record)";
+//          strStatus = "(record)";
     }
     else if (IsPending()) {
         if (IsExpired())
@@ -222,24 +233,28 @@ bool OTRecord::FormatDescription(std::string& str_output) const
         else if (!IsCash())
             strStatus = "(pending)";
     }
+    // ----------------------------------------
     if (IsCanceled()) {
         strStatus = "(CANCELED)";
 
-        if (IsOutgoing() || IsReceipt()) strKind.Format("%s", "sent ");
+        if (IsOutgoing() || IsReceipt())
+            strKind.Format("%s", "sent ");
     }
     else {
         if (IsOutgoing())
             strKind.Format(
                 "%s", ((IsPending() && !IsCash()) ? "outgoing " : "sent "));
-        else // incoming.
-            strKind.Format("%s", IsPending()
-                                     ? "incoming "
-                                     : (IsReceipt() ? "" : "received "));
+        else // Incoming.
+            strKind.Format(
+                "%s", IsPending() ? "incoming "
+                                  : (IsReceipt() ? "" : "received "));
     }
+    // ----------------------------------------
     String strTransNumForDisplay;
 
     if (!IsCash())
         strTransNumForDisplay.Format(" #%" PRId64, GetTransNumForDisplay());
+    // ----------------------------------------
     if (IsRecord()) {
         if (IsTransfer())
             strDescription.Format("%s%s%s %s", strKind.Get(), "transfer",
@@ -292,7 +307,8 @@ bool OTRecord::FormatDescription(std::string& str_output) const
                 const int64_t lAmount =
                     OTAPI_Wrap::It()->StringToLong(m_str_amount);
 
-                if (!IsCanceled() && (lAmount > 0)) strKind.Set("received ");
+                if (!IsCanceled() && (lAmount > 0))
+                    strKind.Set("received ");
 
                 str_instrument_type = "recurring payment";
             }
@@ -300,12 +316,13 @@ bool OTRecord::FormatDescription(std::string& str_output) const
             strDescription.Format("%s%s%s %s", strKind.Get(),
                                   str_instrument_type.c_str(),
                                   strTransNumForDisplay.Get(), strStatus.Get());
-        }
+        } // IsReceipt
         else
             strDescription.Format("%s%s%s %s", strKind.Get(),
                                   GetInstrumentType().c_str(),
                                   strTransNumForDisplay.Get(), strStatus.Get());
-    }
+    } // IsRecord
+    // ----------------------------------------
     else {
         if (IsTransfer())
             strDescription.Format("%s %s%s%s", strStatus.Get(), strKind.Get(),
@@ -370,7 +387,8 @@ bool OTRecord::FormatDescription(std::string& str_output) const
                 const int64_t lAmount =
                     OTAPI_Wrap::It()->StringToLong(m_str_amount);
 
-                if (!IsCanceled() && (lAmount > 0)) strKind.Set("received ");
+                if (!IsCanceled() && (lAmount > 0))
+                    strKind.Set("received ");
 
                 str_instrument_type = "recurring payment (receipt)";
             }
@@ -383,7 +401,8 @@ bool OTRecord::FormatDescription(std::string& str_output) const
             strDescription.Format("%s %s%s%s", strStatus.Get(), strKind.Get(),
                                   GetInstrumentType().c_str(),
                                   strTransNumForDisplay.Get());
-    }
+    } // Not Record.
+    // ----------------------------------------
     str_output = strDescription.Get();
     return (!str_output.empty());
 }
@@ -684,6 +703,7 @@ bool OTRecord::DeleteRecord() const
     case OTRecord::Transfer:   // Delete from asset account recordbox.
     case OTRecord::Receipt:    // Delete from asset account recordbox.
     case OTRecord::Instrument: // Delete from Nym's recordbox.
+    case OTRecord::Notice: // Delete from Nym's recordbox.
         break;
     default:
         otErr << __FUNCTION__ << ": Unexpected type: " << GetInstrumentType()
@@ -1000,12 +1020,25 @@ bool OTRecord::IsPaymentPlan() const
 {
     return m_bIsPaymentPlan;
 }
+    
+void OTRecord::SetSuccess(const bool bIsSuccess)
+{
+    m_bHasSuccess = true;
+    m_bIsSuccess  = bIsSuccess;
+}
+    
+bool OTRecord::HasSuccess(bool & bIsSuccess) const
+{
+    if (m_bHasSuccess)
+        bIsSuccess = m_bIsSuccess;
+    
+    return m_bHasSuccess;
+}
+    
+    
 // For outgoing, pending (not-yet-accepted) instruments.
 //
-bool OTRecord::CancelOutgoing(std::string str_via_acct) const // This can
-                                                              // be
-// blank if it's a
-// cheque.
+bool OTRecord::CancelOutgoing(std::string str_via_acct) const // This can be blank if it's a cheque.
 {
     if (!CanCancelOutgoing()) return false;
 
@@ -1323,7 +1356,10 @@ void OTRecord::SetContents(const std::string& str_contents)
 {
     m_str_contents = str_contents;
 
-    if (!m_str_contents.empty() && (OTRecord::Instrument == GetRecordType())) {
+    if (!m_str_contents.empty() &&
+        ( (OTRecord::Instrument == GetRecordType()) || (OTRecord::Notice == GetRecordType()) )
+        )
+    {
         String strPayment(m_str_contents);
         OTPayment thePayment(strPayment);
 

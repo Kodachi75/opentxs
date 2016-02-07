@@ -392,9 +392,6 @@ bool OTPayment::SetTempValuesFromNotice(const OTTransaction& theInput)
     
 void OTPayment::lowLevelSetTempValuesFromPaymentPlan(const OTPaymentPlan& theInput)
 {
-//    String strDebuggin(theInput);
-//    otErr << "DEBUGGING. PAYMENT PLAN:\n" << strDebuggin << "\n";
-
     m_bAreTempValuesSet = true;
     m_bHasRecipient = true;
     m_bHasRemitter = false;

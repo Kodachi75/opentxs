@@ -133,17 +133,14 @@ shareholders.)
 HUH?? This message doesn't use a transaction number. That's the whole point of
 processNymbox is that it doesn't require such a number.
  processInbox,      // process inbox transaction     // comes from client
- transfer,          // or "spend". This transaction is a request to transfer
-from one account to another
+ transfer,          // or "spend". This transaction is a request to transfer from one account to another
  deposit,           // this transaction is a deposit (cash or cheque)
  withdrawal,        // this transaction is a withdrawal (cash or voucher)
  marketOffer,       // this transaction is a market offer
  paymentPlan,       // this transaction is a payment plan
  smartContract,     // this transaction is a smart contract
- cancelCronItem,    // this transaction is intended to cancel a market offer or
-payment plan.
- exchangeBasket,    // this transaction is an exchange in/out of a basket
-currency.
+ cancelCronItem,    // this transaction is intended to cancel a market offer or payment plan.
+ exchangeBasket,    // this transaction is an exchange in/out of a basket currency.
  payDividend,        // this transaction is dividend payment (to shareholders.)
 
 
@@ -151,45 +148,29 @@ currency.
  HarvestClosingNumbers:    (The X's means "not needed for closing numbers)
 
 // X processNymbox,     // process nymbox transaction     // comes from client
-// HUH?? The whole point of processNymbox is that it uses no transaction
-numbers.
+// HUH?? The whole point of processNymbox is that it uses no transaction numbers.
  X processInbox,      // process inbox transaction     // comes from client
- X transfer,          // or "spend". This transaction is a request to transfer
-from one account to another
+ X transfer,          // or "spend". This transaction is a request to transfer from one account to another
  X deposit,           // this transaction is a deposit (cash or cheque)
  X withdrawal,        // this transaction is a withdrawal (cash or voucher)
- X cancelCronItem,      // this transaction is intended to cancel a market offer
-or payment plan.
- X payDividend,          // this transaction is a dividend payment (to
-shareholders.)
+ X cancelCronItem,      // this transaction is intended to cancel a market offer or payment plan.
+ X payDividend,          // this transaction is a dividend payment (to shareholders.)
 
  // ONLY THESE:
- marketOffer,       // This contains one opening number, and two closing
-numbers.
- paymentPlan,       // This contains one primary opening number (from the payer)
-and his closing number,
- // as well as the opening and closing numbers for the payee. NOTE: Unless the
-paymentPlan SUCCEEDED in
- // activating, then the SENDER's numbers are both still good. (Normally even
-attempting a transaction
- // will burn the opening number, which IS the case here, for the payer. But the
-PAYEE only burns his
- // opening number IF SUCCESS. Thus, even if the message succeeded but the
-transaction failed, where
- // normally the opening number is burned, it's still good for the PAYEE (not
-the payer.) Therefore we
- // need to make sure, in the case of paymentPlan, that we still claw back the
-opening number (FOR THE
- // PAYEE) in the place where we normally would only claw back the closing
-number.
- smartContract,     // This contains an opening number for each party, and a
-closing number for each
- // asset account.
+ marketOffer,       // This contains one opening number, and two closing numbers.
+ paymentPlan,       // This contains one primary opening number (from the payer) and his closing number,
+                    // as well as the opening and closing numbers for the payee. NOTE: Unless the paymentPlan SUCCEEDED in
+                    // activating, then the SENDER's numbers are both still good. (Normally even attempting a transaction
+                    // will burn the opening number, which IS the case here, for the payer. But the PAYEE only burns his
+                    // opening number IF SUCCESS. Thus, even if the message succeeded but the transaction failed, where
+                    // normally the opening number is burned, it's still good for the PAYEE (not the payer.) Therefore we
+                    // need to make sure, in the case of paymentPlan, that we still claw back the opening number (FOR THE
+                    // PAYEE) in the place where we normally would only claw back the closing number.
+ smartContract,     // This contains an opening number for each party, and a closing number for each asset account.
 
-
-
- exchangeBasket,    // this transaction is an exchange in/out of a basket
-currency.
+ 
+ 
+ exchangeBasket,    // this transaction is an exchange in/out of a basketcurrency.
 
 
 
@@ -2185,11 +2166,9 @@ bool OTTransaction::VerifyBalanceReceipt(
         return false;
     }
 
-    // (Notice I don't check inbox item count here, since that actually CAN
-    // change.)
+    // (Notice I don't check inbox item count here, since that actually CAN change.)
 
-    // LOOP THROUGH LATEST INBOX AND GATHER DATA / VALIDATE AGAINST LAST
-    // RECEIPT.
+    // LOOP THROUGH LATEST INBOX AND GATHER DATA / VALIDATE AGAINST LAST RECEIPT.
 
     int64_t lInboxBalanceChange = 0; // Change in the account balance we'd
                                      // expect, based on TOTAL receipts in the
@@ -2210,15 +2189,7 @@ bool OTTransaction::VerifyBalanceReceipt(
         case OTTransaction::basketReceipt:
 
             lInboxBalanceChange +=
-                pTransaction->GetReceiptAmount(); // Here I total ALL relevant
-                                                  // receipts.
-
-        //                otErr << "ON INBOX:  lInboxBalanceChange: %" PRId64 "
-        // pTransaction->GetReceiptAmount(): %" PRId64 "\n", // temp remove
-        // debugging
-        // todo
-        //                              lInboxBalanceChange,
-        // pTransaction->GetReceiptAmount());
+                pTransaction->GetReceiptAmount(); // Here I total ALL relevant receipts.
 
         case OTTransaction::finalReceipt: // finalReceipt has no amount.
         case OTTransaction::pending: // pending has an amount, but it already
@@ -2226,7 +2197,7 @@ bool OTTransaction::VerifyBalanceReceipt(
                                      // figured here.
         case OTTransaction::transferReceipt: // transferReceipt has an amount,
                                              // but it already came out of
-        // account and thus isn't figured in here.
+                                             // account and thus isn't figured in here.
         case OTTransaction::voucherReceipt: // voucherReceipt has an amount, but
                                             // it already came out of account
                                             // and thus isn't figured in here.
@@ -2318,13 +2289,6 @@ bool OTTransaction::VerifyBalanceReceipt(
                                                       // in old receipt inbox
                                                       // but found in current
                                                       // inbox.)
-
-            //                    otErr << "NOT ON RECEIPT:
-            // lInboxSupposedDifference: %" PRId64 "
-            // pTransaction->GetReceiptAmount():
-            // %" PRId64 "\n", // temp remove debugging todo
-            //                                  lInboxSupposedDifference,
-            // pTransaction->GetReceiptAmount());
 
             case OTTransaction::finalReceipt: // This has no value. 0 amount.
             case OTTransaction::pending: // pending has value, why aren't we
@@ -3495,50 +3459,59 @@ case OTItem::acceptNotice:
 //
 // DONE:
 //
-// What about a processNymbox message? ALL of its items must be successful,
-// for any of them to be (for the transaction statement to make any sense....)
+// What about a processNymbox message? ALL of its items must be
+// successful, for any of them to be (for the transaction statement to
+// make any sense....)
 //
-// What I NEED to do , in case of atProcessNymbox and maybe others, is loop
-// through them ALL and check them ALL for success.
+// What I NEED to do , in case of atProcessNymbox and maybe others, is
+// loop through them ALL and check them ALL for success.
 //
 // What it does now is, if it sees an item of a certain type, then it
-// IMMEDIATELY
-// returns success or fail based on its status. Imagine this problem: My
-// transaction
-// failed (say, due to empty account) but the balance statement itself had
-// succeeded
-// before it got to that point. The below loop as it exists now will see that
-// the
-// atBalanceStatement was successful, and IMMEDAITELY RETURNS TRUE! (Even if the
-// item for the transaction itself had failed.)
+// IMMEDIATELY returns success or fail based on its status. Imagine this
+// problem: My transaction failed (say, due to empty account) but the
+// balance statement itself had succeeded before it got to that point.
+// The below loop as it exists now will see that the atBalanceStatement
+// was successful, and IMMEDAITELY RETURNS TRUE! (Even if the item for
+// the transaction itself had failed.)
 //
-// In the case of processNymbox it's worse, since the ENTIRE TRANSACTION must
-// fail, if
-// ANY of its items do. You have to loop them ALL and make sure they are ALL
-// success.
-// (regardless of their type.) You can only do this if you know *this is a
-// processNymbox
-// transaction, yet we can clearly see, that the below code is simply looping
-// the items
+// In the case of processNymbox it's worse, since the ENTIRE TRANSACTION
+// must fail, if ANY of its items do. You have to loop them ALL and make
+// sure they are ALL success. (regardless of their type.) You can only
+// do this if you know *this is a processNymbox transaction, yet we can
+// clearly see, that the below code is simply looping the items
 // REGARDLESS of what type of transaction *this actually is.
 //
-// Note: (Below is now fixed.)
-// What if, as above, the processNymbox failed, but has a successful transaction
-// statement
-// as one of its items? The below loop would return true!
+// Note: (Below is now fixed.) What if, as above, the processNymbox
+// failed, but has a successful transaction statement as one of its
+// items? The below loop would return true!
 //
-// This is actually a pretty good argument for using polymorphism for the
-// various transaction
-// and item types, so these sorts of SWITCH STATEMENTS aren't necessary all over
-// the transaction
-// and ledger code. Although IMO a default implementation should still cover
-// most cases.
+// This is actually a pretty good argument for using polymorphism for
+// the various transaction and item types, so these sorts of SWITCH
+// STATEMENTS aren't necessary all over the transaction and ledger code.
+// Although IMO a default implementation should still cover most cases.
 //
 //
 // Tries to determine, based on items within, whether it was a success or fail.
 //
-bool OTTransaction::GetSuccess()
+bool OTTransaction::GetSuccess(bool * pbHasSuccess/*=nullptr*/, // Just for those who need more detail
+                               bool * pbIsSuccess /*=nullptr*/) // and granularity.
 {
+    // Only used here and there, when more granularity is necessary.
+    // (The return value of false doesn't necessarily mean a transaction
+    // has failed -- only that one hasn't succeeded. So these provide that detail.)
+    //
+    bool bHasSuccess       = false;
+    bool bIsSuccess        = false;
+    // --------------------------------------
+    if (nullptr == pbHasSuccess)    pbHasSuccess = &bHasSuccess;
+    if (nullptr == pbIsSuccess )    pbIsSuccess  = &bIsSuccess;
+    // --------------------------------------
+    // Below this point, the above pointers are always good.
+    // (AKA they're not nullptr.)
+    //
+    *pbHasSuccess = false;
+    *pbIsSuccess  = false;
+    // ---------------------------------------
     bool bFoundAnActionItem = false, bFoundABalanceAgreement = false;
 
     if ((OTTransaction::atProcessInbox == GetType()) ||
@@ -3551,24 +3524,16 @@ bool OTTransaction::GetSuccess()
 
             // BALANCE AGREEMENT  /  TRANSACTION STATEMENT
 
-            // Even if one of these is a success, it is only the balance
-            // agreement for
-            // the transaction itself, which must also be a success. For
-            // example, if there
-            // is a transaction for a cash withdrawal, then it will contain 2
-            // items: one item
-            // is the withdrawal itself, and the other item is the balance
-            // agreement for that
-            // withdrawal. Therefore, even if the balanace agreement item is
-            // successful, the
-            // withdrawal item itself must ALSO be successful, for the
-            // transaction AS A WHOLE
-            // to be "successful."
-            // However, if this balance agreement failed, then the rest of the
-            // transaction has
-            // definitely failed as well.
-            // Therefore, here we either return false, or CONTINUE and let the
-            // decision be made
+            // Even if one of these is a success, it is only the balance agreement
+            // for the transaction itself, which must also be a success. For
+            // example, if there is a transaction for a cash withdrawal, then it
+            // will contain 2 items: one item is the withdrawal itself, and the
+            // other item is the balance agreement for that withdrawal. Therefore,
+            // even if the balanace agreement item is successful, the withdrawal
+            // item itself must ALSO be successful, for the transaction AS A WHOLE
+            // to be "successful." However, if this balance agreement failed, then
+            // the rest of the transaction has definitely failed as well. Therefore,
+            // here we either return false, or CONTINUE and let the decision be made
             // from the other items in this transaction otherwise.
             //
             case Item::atBalanceStatement: // processInbox and
@@ -3583,11 +3548,14 @@ bool OTTransaction::GetSuccess()
                 // server's reply to a transaction statement. Like a balance
                 // statement, except no asset acct is involved.
                 //
-
                 if (Item::acknowledgement == pItem->GetStatus()) {
                     bFoundABalanceAgreement = true;
                 }
-                else if (Item::rejection == pItem->GetStatus()) {
+                else if (Item::rejection == pItem->GetStatus())
+                {
+                    *pbHasSuccess = true; // We DEFINITELY have a success value (of false.) So true/false here.
+//                  *pbIsSuccess  = false; // Already set above.
+
                     return false;
                 }
                 // else continue...
@@ -3609,17 +3577,14 @@ bool OTTransaction::GetSuccess()
                                             // (sign for) transaction
             // numbers that are sitting in his nymbox (since he requested more
             // numbers....)
-            case Item::atAcceptMessage: // processNymbox. server's reply to
-                                        // nym's accepting a message (from
+            case Item::atAcceptMessage: // processNymbox. server's reply to nym's accepting a message (from
                                         // another nym) that's in his nymbox.
-            case Item::atAcceptNotice:  // processNymbox. server's reply to
-                                        // nym's accepting a notice
-            // from the server, such as a successNotice (success signing
-            // out new transaction numbers) or a replyNotice, or an
-            // instrumentNotice.
-            // For example, some server replies are dropped into your Nymbox, to
-            // make sure you receive them. Then you accept them, to remove from
-            // your Nymbox.
+            case Item::atAcceptNotice:  // processNymbox. server's reply to nym's accepting a notice
+                                        // from the server, such as a successNotice (success signing
+                                        // out new transaction numbers) or a replyNotice, or an instrumentNotice.
+                                        // For example, some server replies are dropped into your Nymbox, to
+                                        // make sure you receive them. Then you accept them, to remove from
+                                        // your Nymbox.
 
             // PROCESS NYMBOX *and* PROCESS INBOX
 
@@ -3629,9 +3594,9 @@ bool OTTransaction::GetSuccess()
             case Item::atAcceptFinalReceipt:  // Part of a processInbox or
                                               // processNymbox transaction
                                               // reply from the server.
-            case Item::atDisputeFinalReceipt: // Would be in processNymbox AND
+//          case Item::atDisputeFinalReceipt: // Would be in processNymbox AND
                                               // processInbox. Can these be
-            // disputed? Think through the process. Todo.
+                                              // disputed? Think through the process. Todo.
 
             // PROCESS INBOX
 
@@ -3642,36 +3607,36 @@ bool OTTransaction::GetSuccess()
                                         // nym's request to accept an incoming
                                         // pending transfer that's sitting in
                                         // his asset acct's inbox.
-            case Item::atRejectPending: // processInbox. Same thing, except
+//          case Item::atRejectPending: // processInbox. Same thing, except
                                         // rejecting that pending transfer
                                         // instead of accepting it.
 
-            case Item::atAcceptCronReceipt: // processInbox. Accepting a
-                                            // payment receipt or market
-            // receipt. (Smart contracts also drop payment receipts,
-            // currently.)
-            case Item::atDisputeCronReceipt: // processInbox. Dispute. (Todo.)
+            case Item::atAcceptCronReceipt: // processInbox. Accepting a payment receipt or market
+                                            // receipt. (Smart contracts also drop payment receipts,
+                                            // currently.)
+//          case Item::atDisputeCronReceipt: // processInbox. Dispute. (Todo.)
 
             case Item::atAcceptItemReceipt:  // processInbox. Accepting a
                                              // transferReceipt, or
                                              // chequeReceipt, etc.
-            case Item::atDisputeItemReceipt: // processInbox. Dispute. (Todo.)
+//          case Item::atDisputeItemReceipt: // processInbox. Dispute. (Todo.)
 
             case Item::atAcceptBasketReceipt:  // processInbox. Basket Receipt,
                                                // from a basket currency
                                                // exchange (in or out.)
-            case Item::atDisputeBasketReceipt: // processInbox. dispute basket
-                                               // receipt.
+//          case Item::atDisputeBasketReceipt: // processInbox. dispute basket receipt.
 
-                // If we found at least one of these, and nothing fails by the
-                // end of the loop,
-                // then for processNymbox and processInbox, it's a success. (If
-                // balance agreement also...)
+                // If we found at least one of these, and nothing fails by the end of the loop,
+                // then for processNymbox and processInbox, it's a success. (If balance agreement also...)
 
                 if (Item::acknowledgement == pItem->GetStatus()) {
                     bFoundAnActionItem = true;
                 }
-                else if (Item::rejection == pItem->GetStatus()) {
+                else if (Item::rejection == pItem->GetStatus())
+                {
+                    *pbHasSuccess = true; // We DEFINITELY have a success value (of false.) So true/false here.
+//                  *pbIsSuccess  = false; // Already set above.
+
                     return false;
                 }
                 // else continue...
@@ -3686,96 +3651,94 @@ bool OTTransaction::GetSuccess()
             } // switch
         }
 
-        return (bFoundABalanceAgreement && bFoundAnActionItem);
+        const bool bReturnValue = (bFoundABalanceAgreement && bFoundAnActionItem);
+        
+        // If we didn't even have a balance agreement or action item, then we couldn't
+        // say for sure whether or not it was a "success". (We just don't know.)
+        *pbHasSuccess = bReturnValue;
+        
+        // In the above switch, if an Item::rejection was found, then we KNOW we found the success
+        // status, and we KNOW it failed. (And we returned already.) Whereas here, we only know
+        // whether we have the success status if *pbHasSuccess is true. And IF it is, then we KNOW
+        // the item is acknowledged, since we would already have returned above if it had been rejected.
+        if (*pbHasSuccess)
+            *pbIsSuccess  = true; // If it were false we would already have returned above.
+
+        return bReturnValue;
 
     } // if processNymbox or processInbox.
-
+    // --------------------------------------------------------------
     // Okay, it's not a processNymbox or processInbox.
     //
     // Maybe it's one of these other transaction types...
-
     for (auto& it : m_listItems) {
         Item* pItem = it;
         OT_ASSERT(nullptr != pItem);
 
         switch (pItem->GetType()) {
-        //            case OTItem::atServerfee:            // Fees currently
-        // aren't coded. Todo.
-        //            case OTItem::atIssuerfee:            // Same as above.
-        // Todo.
+//      case OTItem::atServerfee:  // Fees currently aren't coded. Todo.
+//      case OTItem::atIssuerfee:  // Same as above. Todo.
 
         // BALANCE AGREEMENT  /  TRANSACTION STATEMENT
 
         // Even if one of these is a success, it is only the balance agreement
-        // for
-        // the transaction itself, which must also be a success. For example, if
-        // there
-        // is a transaction for a cash withdrawal, then it will contain 2 items:
-        // one item
-        // is the withdrawal itself, and the other item is the balance agreement
-        // for that
-        // withdrawal. Therefore, even if the balanace agreement item is
-        // successful, the
-        // withdrawal item itself must ALSO be successful, for the transaction
-        // AS A WHOLE
-        // to be "successful."
-        // However, if this balance agreement failed, then the rest of the
-        // transaction has
-        // definitely failed as well.
-        // Therefore, here we either return false, or CONTINUE and let the
-        // decision be made
+        // for the transaction itself, which must also be a success. For
+        // example, if there is a transaction for a cash withdrawal, then it
+        // will contain 2 items: one item is the withdrawal itself, and the
+        // other item is the balance agreement for that withdrawal. Therefore,
+        // even if the balanace agreement item is successful, the withdrawal
+        // item itself must ALSO be successful, for the transaction AS A WHOLE
+        // to be "successful." However, if this balance agreement failed, then
+        // the rest of the transaction has definitely failed as well. Therefore,
+        // here we either return false, or CONTINUE and let the decision be made
         // from the other items in this transaction otherwise.
         //
-        case Item::atBalanceStatement: // processInbox and
-                                       // notarizeTransaction. server's reply
-                                       // to a
-        // balance statement. One of these items appears inside any
-        // transaction reply.
-        case Item::atTransactionStatement: // processNymbox and also for
-                                           // starting/stopping any cron
-                                           // items.
-            // (notarizeTransaction: payment plan, market offer, smart
-            // contract, trigger clause, cancel cron item, etc.) The server's
-            // reply to a transaction statement. Like a balance statement,
-            // except no asset acct is involved.
+        case Item::atBalanceStatement: // processInbox and notarizeTransaction. server's reply
+                                       // to a balance statement. One of these items appears inside any
+                                       // transaction reply.
+        case Item::atTransactionStatement: // processNymbox and also for starting/stopping any cron items.
+                                           // (notarizeTransaction: payment plan, market offer, smart
+                                           // contract, trigger clause, cancel cron item, etc.) The server's
+                                           // reply to a transaction statement. Like a balance statement,
+                                           // except no asset acct is involved.
 
             if (Item::acknowledgement == pItem->GetStatus()) {
                 bFoundABalanceAgreement = true;
             }
-            if (Item::rejection == pItem->GetStatus()) {
+            if (Item::rejection == pItem->GetStatus())
+            {
+                *pbHasSuccess = true; // We DEFINITELY have a success value (of false.) So true/false here.
+//              *pbIsSuccess  = false; // Already set above.
+                
                 return false;
             }
-            // else continue...
-            //
-            continue;
-
+                
+            if (bFoundAnActionItem)
+                break;
+            else
+                continue;
+        // -------------------------------------------------
         /*
-         atProcessNymbox,   // process nymbox reply             // comes from
-         server
-         atProcessInbox,    // process inbox reply             // comes from
-         server
+         atProcessNymbox,   // process nymbox reply   // comes from server
+         atProcessInbox,    // process inbox reply    // comes from server
 
-         // Note: the above two transaction types are handled in the switch
-         block above this one.
-         // Whereas the below transaction types are handled right here in this
-         switch block.
+         // Note: the above two transaction types are handled in the switch block above this one.
+         // Whereas the below transaction types are handled right here in this switch block.
 
-         atTransfer,        // reply from the server regarding a transfer
-         request
+         atTransfer,        // reply from the server regarding a transfer request
          atDeposit,         // reply from the server regarding a deposit request
-         atWithdrawal,      // reply from the server regarding a withdrawal
-         request
+         atWithdrawal,      // reply from the server regarding a withdrawal request
          atMarketOffer,     // reply from the server regarding a market offer
          atPaymentPlan,     // reply from the server regarding a payment plan
          atSmartContract,   // reply from the server regarding a smart contract
-         atCancelCronItem,  // reply from the server regarding said
-         cancellation.
+         atCancelCronItem,  // reply from the server regarding said cancellation.
          atExchangeBasket,  // reply from the server regarding said exchange.
          */
 
         // NOTARIZE TRANSACTION
         // If any of these are a success, then the transaction as a whole is a
-        // success also.
+        // success also. (But that's still predicated on a successful balance agreement
+        // also being present.)
 
         case Item::atTransfer: // notarizeTransaction. server's reply to
                                // nym's request to initiate a transfer
@@ -3803,24 +3766,36 @@ bool OTTransaction::GetSuccess()
         case Item::atExchangeBasket: // notarizeTransaction. server's reply to
                                      // request to exchange in or out of a
                                      // basket currency.
+            if (Item::acknowledgement == pItem->GetStatus()) {
+                bFoundAnActionItem = true;
+            }
+            else if (Item::rejection == pItem->GetStatus())
+            {
+                *pbHasSuccess = true; // We DEFINITELY have a success value (of false.) So true/false here.
+//              *pbIsSuccess  = false; // Already set above.
+                
+                return false;
+            }
 
+            if (bFoundABalanceAgreement)
+                break;
+            else
+                continue;
+        // -------------------------------------------------
         // RECEIPTS
 
         // 1. ACTUAL RECEIPTS (item attached to similar transaction), and also
         // 2. INBOX REPORT ITEMS (sub-item to ANOTHER item, which is used on
-        // Balance Agreements and Transaction Statements.)
+        //    Balance Agreements and Transaction Statements.)
         //
         // In case of (1), GetSuccess() is relevant.
         // But in case of (2) GetSuccess() is NOT relevant. FYI.
         //
-        // Anyway, if a marketReceipt item is attached to a marketReceipt
-        // transaction, then we
-        // can return success or failure right away, since such status is set on
-        // the item, not
-        // the transaction, and since there are no other items that matter if
-        // this IS a success.
+        // Anyway, if a marketReceipt item is attached to a marketReceipt transaction, then we
+        // can return success or failure right away, since such status is set on the item, not
+        // the transaction, and since there are no other items that matter if this IS a success.
 
-        //            case OTItem::chequeReceipt:   // not needed in OTItem.
+//      case OTItem::chequeReceipt:   // not needed in OTItem.
         // Meaning, actual OTTransaction cheque receipts do NOT need a
         // chequeReceipt Item attached....
         case Item::chequeReceipt: // ...but it's here anyway as a type, for
@@ -3832,24 +3807,48 @@ bool OTTransaction::GetSuccess()
         case Item::paymentReceipt:  // Used for actual payment receipts, as
                                     // well as for balance agreement sub-items.
         case Item::transferReceipt: // Used for actual transfer receipts, as
-                                    // well as for balance
-        // agreement sub-items. (Hmm does balance agreement need this?)
+                                    // well as for balance agreement sub-items.
+                                    // (Hmm does balance agreement need this?)
         case Item::finalReceipt:  // Used for actual final receipt (I think) as
-                                  // well as for balance agreement sub item (I
-                                  // think.)
+                                  // well as for balance agreement sub item (I think.)
         case Item::basketReceipt: // Used for basket receipt (I think) as well
-                                  // as for balance agreement sub-item (I
-                                  // think.)
+                                  // as for balance agreement sub-item (I think.)
 
-            if (Item::acknowledgement == pItem->GetStatus()) {
-                bFoundAnActionItem = true;
+            if (Item::acknowledgement == pItem->GetStatus())
+            {
+                *pbHasSuccess = true; // We DEFINITELY have a success value. (HasSuccess = true)
+                *pbIsSuccess  = true; // ...and that value is acknowledgment (IsSuccess  = true as well)
             }
-            else if (Item::rejection == pItem->GetStatus()) {
-                return false;
+            else if (Item::rejection == pItem->GetStatus())
+            {
+                *pbHasSuccess = true; // We DEFINITELY have a success value. (Of false.) So true/false.
+//              *pbIsSuccess  = false; // Already set above.
             }
 
-            break;
+            // False regardless, because this isn't a real transaction, only an inbox receipt.
+            // (That's why you have to check the two output parameters if you want this info.)
+            return false;
+        // -------------------------------------------------
+        // Used to inform Nyms about success/failure status of
+        // the activation of payment plans and smart contracts.
+        //
+        case Item::notice:
+                
+            if (Item::acknowledgement == pItem->GetStatus())
+            {
+                *pbHasSuccess = true;
+                *pbIsSuccess  = true;
+            }
+            else if (Item::rejection  == pItem->GetStatus())
+            {
+                *pbHasSuccess = true;
+//              *pbIsSuccess  = false; // Already set above.
+            }
 
+            // False regardless, because this isn't a real transaction, only a notice.
+            // (That's why you have to check the two output parameters if you want this info.)
+            return false;
+        // -----------------------------------------------
         default:
             otErr << "Wrong transaction type passed to "
                      "OTTransaction::GetSuccess()\n";
@@ -3857,11 +3856,23 @@ bool OTTransaction::GetSuccess()
         }
     }
 
-    return (bFoundABalanceAgreement && bFoundAnActionItem);
+    const bool bReturnValue = (bFoundABalanceAgreement && bFoundAnActionItem);
+    
+    // If we didn't even have a balance agreement or action item, then we couldn't
+    // say for sure whether or not it was a "success". (We just don't know.)
+    *pbHasSuccess = bReturnValue;
+    
+    // In the above switch, if an Item::rejection was found, then we KNOW we found the success
+    // status, and we KNOW it failed. (And we returned already.) Whereas here, we only know
+    // whether we have the success status if *pbHasSuccess is true. And IF it is, then we KNOW
+    // the item is acknowledged, since we would already have returned above if it had been rejected.
+    if (*pbHasSuccess)
+        *pbIsSuccess  = true; // If it were false we would already have returned above.
+    
+    return bReturnValue;
 }
 
-// Todo: eliminate this function since there is already a list of strings at the
-// top
+// Todo: eliminate this function since there is already a list of strings at the top
 // of this file, and a list of enums at the top of the header file.
 //
 // static
@@ -4410,43 +4421,41 @@ paymentOutbox. (When done, they go to recordBox to await deletion.)
  // These all come from the asset account inbox (where they are transferred from
 before they end up in the record box.)
     "pending",            // Pending transfer, in the inbox/outbox. (This can
-end up in your recordBox if you cancel your pending outgoing transfer.)
+                          // end up in your recordBox if you cancel your pending outgoing transfer.)
     "transferReceipt",    // the server drops this into your inbox, when someone
-accepts your transfer.
+                          // accepts your transfer.
     "chequeReceipt",    // the server drops this into your inbox, when someone
-cashes your cheque.
+                        // cashes your cheque.
     "voucherReceipt",    // the server drops this into your inbox, when someone
-cashes your voucher.
+                         // cashes your voucher.
     "marketReceipt",    // server drops this into inbox periodically, if you
-have an offer on the market.
+                        // have an offer on the market.
     "paymentReceipt",    // the server drops this into people's inboxes,
-periodically, if they have payment plans.
+                         // periodically, if they have payment plans.
     "finalReceipt",     // the server drops this into your inbox(es), when a
-CronItem expires or is canceled.
+                        // CronItem expires or is canceled.
     "basketReceipt",    // the server drops this into your inboxes, when a
-basket exchange is processed.
+                        // basket exchange is processed.
 
- // Record box may also store things that came from a Nymbox, and then had to go
-somewhere client-side for storage,
- // until user decides to delete them. For example:
-    "notice",            // in nymbox, notice from the server. Probably contains
-an updated smart contract.
+// Record box may also store things that came from a Nymbox, and then had to go
+// somewhere client-side for storage, until user decides to delete them.
+// For example:
+    "notice",  // in nymbox, notice from the server. Probably contains an updated smart contract.
 
 // Whereas for a recordBox storing paymentInbox/paymentOutbox receipts, once
-they are completed, they go here to die.
-    "instrumentNotice",        // Receive these in paymentInbox, and send in
-paymentOutbox. (When done, they go to recordBox to await deletion.)
+// they are completed, they go here to die.
+    "instrumentNotice",       // Receive these in paymentInbox, and send in
+                              // paymentOutbox. (When done, they go to recordBox to await deletion.)
     "instrumentRejection",    // When someone rejects your invoice from his
-paymentInbox, you get one of these in YOUR paymentInbox.
-
+                              // paymentInbox, you get one of these in YOUR paymentInbox.
  */
 
 /*
   --- paymentInbox ledger:
-    "instrumentNotice",        // Receive these in paymentInbox, and send in
-  paymentOutbox. (When done, they go to recordBox to await deletion.)
+    "instrumentNotice",       // Receive these in paymentInbox, and send in
+                              // paymentOutbox. (When done, they go to recordBox to await deletion.)
     "instrumentRejection",    // When someone rejects your invoice from his
-  paymentInbox, you get one of these in YOUR paymentInbox.
+                              // paymentInbox, you get one of these in YOUR paymentInbox.
  */
 void OTTransaction::SaveAbbrevPaymentInboxRecord(Tag& parent)
 {
@@ -5756,8 +5765,7 @@ void OTTransaction::CalculateNumberOfOrigin()
 /// But if marketReceipt, then it's in reference to the original market offer
 /// (which is my own trans#)
 /// But if paymentReceipt, then it's in reference to the original "activate
-/// payment plan" request, which
-/// may or may not be mine.
+/// payment plan" request, which may or may not be mine.
 ///
 /// Internally of course, a chequeReceipt is "in reference to" the depositor's
 /// deposit request.
@@ -5766,15 +5774,11 @@ void OTTransaction::CalculateNumberOfOrigin()
 /// wrote it. Thus we have this function for resolving the "display reference #"
 /// in cases like that.
 ///
-/// Another example: with market trades, you want the "in reference to" to show
-/// the trans# of the original
+/// Another example: with market trades, you want the "in reference to" to show the trans# of the original
 /// market offer request.
-/// Of course, if you load up the item within, you can get the "in reference to"
-/// showing a different trans#
-/// for EACH TRADE THAT HAS OCCURRED. We use that internally, we need to be able
-/// to reference each of those
-/// trades. But the user merely wants to see that his receipt is in reference to
-/// the original market offer,
+/// Of course, if you load up the item within, you can get the "in reference to" showing a different trans#
+/// for EACH TRADE THAT HAS OCCURRED. We use that internally, we need to be able to reference each of those
+/// trades. But the user merely wants to see that his receipt is in reference to the original market offer,
 /// so he can line up his receipts with his offers. What else does he care?
 ///
 int64_t OTTransaction::GetReferenceNumForDisplay()
@@ -5792,7 +5796,6 @@ int64_t OTTransaction::GetReferenceNumForDisplay()
     case OTTransaction::marketReceipt:
     case OTTransaction::paymentReceipt:
     case OTTransaction::basketReceipt:
-    case OTTransaction::finalReceipt:
     case OTTransaction::instrumentNotice:
             /*
              NOTE: Right about here you might be wondering to yourself, Hmm,
@@ -5818,6 +5821,38 @@ int64_t OTTransaction::GetReferenceNumForDisplay()
         lReferenceNum = GetReferenceToNum();
         break;
 
+            
+    case OTTransaction::finalReceipt: {
+        lReferenceNum = GetReferenceToNum();
+
+        String strRef;
+        GetReferenceString(strRef);
+        if (strRef.Exists())
+        {
+            std::unique_ptr<OTCronItem> pCronItem(OTCronItem::NewCronItem(strRef));
+            
+            if (pCronItem)
+            {
+                lReferenceNum = pCronItem->GetTransactionNum();
+                // -------------------------------------------
+                OTPaymentPlan   * pPlan          = dynamic_cast<OTPaymentPlan  *>(pCronItem.get());
+                OTSmartContract * pSmartContract = dynamic_cast<OTSmartContract*>(pCronItem.get());
+                
+                if (nullptr != pPlan) {
+                    lReferenceNum = pPlan->GetRecipientOpeningNum();
+                }
+                else if (nullptr != pSmartContract) {
+                    const std::vector<int64_t> & openingNumsInOrderOfSigning =
+                        pSmartContract->openingNumsInOrderOfSigning();
+                    
+                    if (openingNumsInOrderOfSigning.size() > 0)
+                    lReferenceNum = openingNumsInOrderOfSigning[0];
+                }
+                // -------------------------------------------
+            }
+        }
+        } break;
+            
     // A transferReceipt ACTUALLY references the acceptPending (recipient's
     // trans#) that accepted it.
     // But I don't care about the recipient's transaction #s! This function is
@@ -5831,7 +5866,7 @@ int64_t OTTransaction::GetReferenceNumForDisplay()
         lReferenceNum = GetNumberOfOrigin();
         break;
 
-    default: // All other types have no amount -- return 0.
+    default: // All other types have no display reference number -- return 0.
         return 0;
     }
 
@@ -5892,14 +5927,6 @@ bool OTTransaction::GetSenderNymIDForDisplay(Identifier& theReturnID)
     GetReferenceString(strReference);
 
     if (strReference.GetLength() < 2) return false;
-
-    
-//    String strBlah(*this);
-//    
-//    otErr << "DEBUGGING OTTransaction:\n" << strBlah << "\n";
-    
-    
-    
     
     switch (GetType())
     {

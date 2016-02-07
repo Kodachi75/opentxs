@@ -119,9 +119,9 @@ OTTransactionType* OTTransactionType::TransactionFactory(String strInput)
             // OTLedger::ProcessXMLNode.
             // Specifically, it happens when m_bLoadSecurely is set to false.
             //
-            //          pContract->SetRealNotaryID(pItem->GetPurportedNotaryID());
-            //          pContract->SetRealAccountID(pItem->GetPurportedAccountID());
-            //
+//          pContract->SetRealNotaryID(pItem->GetPurportedNotaryID());
+//          pContract->SetRealAccountID(pItem->GetPurportedAccountID());
+
             return pContract;
         }
         else {
@@ -167,7 +167,7 @@ OTTransactionType::OTTransactionType()
     // this function is private to prevent people from using it.
     // Should never actually get called.
 
-    //    InitTransactionType(); // Just in case.
+//  InitTransactionType(); // Just in case.
 }
 
 OTTransactionType::OTTransactionType(const Identifier& theNymID,
@@ -181,13 +181,12 @@ OTTransactionType::OTTransactionType(const Identifier& theNymID,
     , m_lNumberOfOrigin(0)
     , m_bLoadSecurely(true)
 {
-    //    InitTransactionType();
+//  InitTransactionType();
 
-    //  m_ID            = theAccountID  -- This happens in Contract, no need
-    // to do it twice.
+//  m_ID = theAccountID  -- This happens in Contract, no need to do it twice.
 
-    // do NOT set m_AcctID and m_AcctNotaryID here.  Let the child classes LOAD
-    // them or GENERATE them.
+    // do NOT set m_AcctID and m_AcctNotaryID here.  Let the child classes
+    // LOAD them or GENERATE them.
 }
 
 OTTransactionType::OTTransactionType(const Identifier& theNymID,
@@ -204,13 +203,12 @@ OTTransactionType::OTTransactionType(const Identifier& theNymID,
 {
     // This initializes m_lTransactionNum, so it must come FIRST.
     // In fact, that's the general rule with this function.
-    //    InitTransactionType();
+//  InitTransactionType();
 
-    //  m_ID                = theAccountID  -- This happens in Contract, no
-    // need to do it twice.
+//  m_ID = theAccountID  -- This happens in Contract, no need to do it twice.
 
-    // do NOT set m_AcctID and m_AcctNotaryID here.  Let the child classes LOAD
-    // them or GENERATE them.
+    // do NOT set m_AcctID and m_AcctNotaryID here.  Let the child classes
+    // LOAD them or GENERATE them.
 }
 
 // Note: can probably remove this function entirely...
@@ -232,17 +230,16 @@ void OTTransactionType::Release_TransactionType()
 {
     // If there were any dynamically allocated objects, clean them up here.
 
-    //  m_ID.Release();
+//  m_ID.Release();
     m_AcctID.Release(); // Compare m_AcctID to m_ID after loading it from string
                         // or file. They should match, and signature should
                         // verify.
 
-    //    m_NotaryID.Release();       // Notary ID as used to instantiate the
-    // transaction, based on expected NotaryID.
+//  m_NotaryID.Release(); // Notary ID as used to instantiate the transaction, based on expected NotaryID.
     m_AcctNotaryID.Release(); // Actual NotaryID within the signed portion.
                               // (Compare to m_NotaryID upon loading.)
 
-    //    m_AcctNymID.Release();
+//  m_AcctNymID.Release();
 
     m_lTransactionNum = 0;
     m_lInReferenceToTransaction = 0;
@@ -251,13 +248,11 @@ void OTTransactionType::Release_TransactionType()
     m_ascInReferenceTo.Release(); // This item may be in reference to a
                                   // different item
 
-    // This was causing OTLedger to fail loading. Can't set this to true until
-    // the END
-    // of loading. Todo: Starting reading the END TAGS during load. For example,
-    // the OTLedger
+    // This was causing OTLedger to fail loading. Can't set this to true until the END
+    // of loading. Todo: Starting reading the END TAGS during load. For example, the OTLedger
     // END TAG could set this back to true...
     //
-    //  m_bLoadSecurely = true; // defaults to true.
+//  m_bLoadSecurely = true; // defaults to true.
 
     m_Numlist.Release();
 }
@@ -327,8 +322,7 @@ bool OTTransactionType::VerifyContractID() const
     // m_AcctID contains the number we read from the xml file
     // we can compare it to the existing and actual identifier.
 
-    // m_AcctID  contains the "IDENTIFIER" of the object, according to the xml
-    // file.
+    // m_AcctID  contains the "IDENTIFIER" of the object, according to the xml file.
     //
     // Meanwhile m_ID contains the same identifier, except it was generated.
     //
@@ -345,17 +339,16 @@ bool OTTransactionType::VerifyContractID() const
               << "\n m_NotaryID: " << str3 << "\n m_AcctNotaryID: " << str4
               << "\n";
 
-        //        OT_FAIL;  // I was debugging.
+//      OT_FAIL;  // I was debugging.
 
         return false;
     }
     else {
-        //        OTString str1(m_AcctID), str2(m_AcctNotaryID);
-        //        otErr << "Expected Account ID and Notary ID both *SUCCESSFUL*
-        // match to "
-        //                "IDs in the xml:\n Account ID:\n%s\n NotaryID:\n%s\n"
-        //                "-----------------------------------------------------------------------------\n",
-        //                str1.Get(), str2.Get());
+//        OTString str1(m_AcctID), str2(m_AcctNotaryID);
+//        otErr << "Expected Account ID and Notary ID both *SUCCESSFUL* match to "
+//                "IDs in the xml:\n Account ID:\n%s\n NotaryID:\n%s\n"
+//                "-----------------------------------------------------------------------------\n",
+//                str1.Get(), str2.Get());
         return true;
     }
 }
@@ -407,16 +400,12 @@ void OTTransactionType::SetNumberOfOrigin(OTTransactionType& setFrom)
 // and see if they share the same origin number.
 //
 // Let's say Alice sends a transfer #100 to Bob.
-// Then Bob receives a pending in his inbox, #800, which is in reference to
-// #100.
-// Then Bob accepts the pending with processInbox #45, which is in reference to
-// #800.
+// Then Bob receives a pending in his inbox, #800, which is in reference to #100.
+// Then Bob accepts the pending with processInbox #45, which is in reference to #800.
 // Then Alice receives a transferReceipt #64, which is in reference to #45.
-// Then Alice accepts the transferReceipt with processInbox #91, in reference to
-// #64.
+// Then Alice accepts the transferReceipt with processInbox #91, in reference to #64.
 //
-// ALL OF THOSE transactions and receipts will have origin #100 attached to
-// them.
+// ALL OF THOSE transactions and receipts will have origin #100 attached to them.
 //
 bool OTTransactionType::VerifyNumberOfOrigin(OTTransactionType& compareTo)
 {

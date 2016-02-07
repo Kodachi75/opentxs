@@ -511,9 +511,9 @@ public:
         return m_lInRefDisplay;
     }
 
-    void SetAbbrevInRefDisplay(int64_t lAmount)
+    void SetAbbrevInRefDisplay(int64_t lVal)
     {
-        m_lInRefDisplay = lAmount;
+        m_lInRefDisplay = lVal;
     }
 
     // These are used exclusively by replyNotice (so you can tell
@@ -562,8 +562,28 @@ public:
         return m_DATE_SIGNED;
     }
 
-    EXPORT bool GetSuccess(); // Tries to determine, based on items within,
-                              // whether it was a success or fail.
+    // Tries to determine, based on items within,
+    // whether the transaction was a success or fail.
+    // NOTE: The 2 parameters are for notices. A notice
+    // is not a "transaction" per se, but it is used to
+    // give notice that a cron item has successfully activated
+    // (or not.) So GetSuccess will return false if it's a notice,
+    // so that's why we have the 2 bool parameters.
+    //
+    // NOTE: I'm also using the 2 parameters for regular success status,
+    // not just notice success status. Why? Because the boolean returned
+    // by this function, if false, doesn't mean there was a failure. Rather,
+    // it means there was no transaction at all, OR there was, but it failed.
+    // Much of the code uses it this way, not needing any more detail than that.
+    // But certain code may someday really need to know the nitty-gritty,
+    // so I'm using these paramters to return that information.
+    //
+    // WARNING: returns FALSE for notices and receipts, even if the 2 parameters
+    // come back as TRUE. That's because it ONLY returns TRUE in the event that this
+    // transaction is an actual transaction. (And a receipt or notice is not an actual
+    // transaction.)
+    EXPORT bool GetSuccess(bool * pbHasSuccess = nullptr,
+                           bool * pbIsSuccess  = nullptr);
 
     EXPORT int64_t GetReceiptAmount(); // Tries to determine IF there is an
                                        // amount (depending on type) and return

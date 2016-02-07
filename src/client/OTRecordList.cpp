@@ -1675,8 +1675,7 @@ bool OTRecordList::Populate()
                     const std::string* p_str_asset_type =
                         &OTRecordList::s_blank; // <========== ASSET TYPE
                     const std::string* p_str_asset_name =
-                        &OTRecordList::s_blank; // instrument definition display
-                                                // name.
+                        &OTRecordList::s_blank; // instrument definition display name.
                     std::string str_amount;     // <========== AMOUNT
                     std::string str_type;       // Instrument type.
                     std::string str_memo;
@@ -1686,8 +1685,7 @@ bool OTRecordList::Populate()
                     
                     if (pBoxTrans->IsAbbreviated()) {
                         str_type =
-                            pBoxTrans->GetTypeString(); // instrumentNotice,
-                                                        // etc.
+                            pBoxTrans->GetTypeString(); // instrumentNotice, etc.
                         int64_t lAmount = pBoxTrans->GetAbbrevDisplayAmount();
 
                         if (0 != lAmount) {
@@ -1696,8 +1694,7 @@ bool OTRecordList::Populate()
                             str_amount = strTemp.Get();
                         }
                     }
-                    else // NOT abbreviated. (Full box receipt is already
-                           // loaded.)
+                    else // NOT abbreviated. (Full box receipt is already loaded.)
                     {
                         OTPayment* pPayment =
                             GetInstrument(*pNym, nIndex, *pInbox);
@@ -1707,8 +1704,7 @@ bool OTRecordList::Populate()
                             pPayment) // then we treat it like it's abbreviated.
                         {
                             str_type =
-                                pBoxTrans->GetTypeString(); // instrumentNotice,
-                                                            // etc.
+                                pBoxTrans->GetTypeString(); // instrumentNotice, etc.
                             int64_t lAmount =
                                 pBoxTrans->GetAbbrevDisplayAmount();
 
@@ -1775,20 +1771,14 @@ bool OTRecordList::Populate()
                                     theInstrumentDefinitionID)) {
                                 String strTemp(theInstrumentDefinitionID);
                                 const std::string str_inpmt_asset(
-                                    strTemp.Get()); // The instrument definition
-                                                    // we found
-                                                    // on the payment (if we
-                                                    // found anything.)
+                                    strTemp.Get()); // The instrument definition we found
+                                                    // on the payment (if we found anything.)
                                 auto it_asset = m_assets.find(str_inpmt_asset);
-                                if (it_asset != m_assets.end()) // Found it on
-                                                                // the map of
-                                // instrument definitions
-                                // we care
-                                // about.
+                                if (it_asset != m_assets.end()) // Found it on the map of instrument
+                                                                // definitions we care about.
                                 {
                                     p_str_asset_type =
-                                        &(it_asset->first); // Set the asset
-                                                            // type ID.
+                                        &(it_asset->first); // Set the asset type ID.
                                     p_str_asset_name =
                                         &(it_asset->second); // The CurrencyTLA.
                                                              // Examples: USD,
@@ -1931,6 +1921,19 @@ bool OTRecordList::Populate()
                     //
 //                  if (OTTransaction::notice == pBoxTrans->GetType())
 //                      bOutgoing = true;
+                    // -------------------------------------------
+                    bool bHasSuccess = false;
+                    bool bIsSuccess  = false;
+                    
+                    bool bCanceled   = false;
+                    // (A transaction object containing a notice of a success is not the same thing
+                    // as a transaction object containing a successful transaction. In the latter
+                    // case, it's the transaction itself. In the former, it's a separate object that
+                    // serves notice that something has occurred. A notice, for example, does not
+                    // contain a balance agreement. So you couldn't say it's a "successful transaction"
+                    // even though it is serving notice to various parties that a cron item was successfully
+                    // (or not) activated.)
+                    // -------------------------------------------
                     ++nIndex; // 0 on first iteration.
                     otInfo << __FUNCTION__
                           << ": Payment RECORD index: " << nIndex << "\n";
@@ -1938,9 +1941,24 @@ bool OTRecordList::Populate()
                                           // (depending on whether it was originally incoming or outgoing.)
                     std::string str_other_nym_id;
                     std::string str_other_acct_id;
-
+                    
+                    OTRecord::OTRecordType recordType = OTRecord::Instrument;
+                    
                     if (!pBoxTrans->IsAbbreviated())
                     {
+                        // We ignore the return value of GetSuccess, since it's not
+                        // detailed enough for our needs here.
+                        //
+                        pBoxTrans->GetSuccess(&bHasSuccess, &bIsSuccess);
+
+                        if (OTTransaction::notice == pBoxTrans->GetType())
+                        {
+                            recordType = OTRecord::Notice;
+                            
+                            if (pBoxTrans->IsCancelled())
+                                bCanceled = true;
+                        }
+                        // ----------------------------------------
                         Identifier theSenderID, theSenderAcctID;
                         Identifier theRecipientID, theRecipientAcctID;
 
@@ -1958,6 +1976,7 @@ bool OTRecordList::Populate()
                             {
                                 if (OTTransaction::notice == pBoxTrans->GetType())
                                     bOutgoing = false; // Payment Plan "sender" of funds (payer) is the recipient of the plan.
+                                                       // TODO: smart contracts?
                                 else
                                     bOutgoing = true; // if Nym is the sender, then it must have been outgoing.
 
@@ -1989,6 +2008,7 @@ bool OTRecordList::Populate()
                                 
                                 if (OTTransaction::notice == pBoxTrans->GetType())
                                     bOutgoing = true; // Payment Plan "recipient" of funds (merchant) is the sender of the plan.
+                                                      // TODO: Smart contracts?
                                 else
                                     bOutgoing = false;
 
@@ -2024,6 +2044,7 @@ bool OTRecordList::Populate()
                                 //
                                 if (OTTransaction::notice == pBoxTrans->GetType())
                                     bOutgoing = false; // Payment Plan "sender" of funds (payer) is the recipient of the plan.
+                                                       // TODO: Smart contracts?
                                 else
                                     bOutgoing = true; // if Nym is the sender, then it must have been outgoing.
 
@@ -2246,12 +2267,14 @@ bool OTRecordList::Populate()
                         bOutgoing, // Since it's the recordbox, it contains both incoming and outgoing receipts.
                         true,      // IsRecord
                         false,     // IsReceipt,
-                        OTRecord::Instrument));
+                        recordType));
                     
                     if (strContents.Exists())
                         sp_Record->SetContents(strContents.Get());
+                    
                     sp_Record->SetDateRange(tValidFrom, tValidTo);
                     sp_Record->SetBoxIndex(nIndex);
+                    
                     if (!str_memo.empty()) sp_Record->SetMemo(str_memo);
                     if (!str_other_nym_id.empty())
                         sp_Record->SetOtherNymID(str_other_nym_id);
@@ -2264,6 +2287,12 @@ bool OTRecordList::Populate()
                         sp_Record->SetTransNumForDisplay(pBoxTrans->GetReferenceNumForDisplay());
                     sp_Record->SetTransactionNum(pBoxTrans->GetTransactionNum());
 
+                    if (bHasSuccess)
+                        sp_Record->SetSuccess(bIsSuccess);
+                    
+                    if (bCanceled)
+                        sp_Record->SetCanceled();
+                    
 //                    otErr << "DEBUGGING! RECORD LIST: Added " << (bOutgoing ? "sent": "received") << " payment record: " <<
 //                    pBoxTrans->GetTypeString() << "\n str_nym_id: " << str_nym_id << "\n str_other_nym_id: " << str_other_nym_id <<
 //                    "\n pBoxTrans->GetTransactionNum(): " << pBoxTrans->GetTransactionNum() <<
@@ -2307,6 +2336,19 @@ bool OTRecordList::Populate()
                     //
 //                  if (OTTransaction::notice == pBoxTrans->GetType())
 //                      bOutgoing = true;
+                    // -------------------------------------------
+                    bool bHasSuccess = false;
+                    bool bIsSuccess  = false;
+                    
+                    bool bCanceled   = false;
+                    // (A transaction object containing a notice of a success is not the same thing
+                    // as a transaction object containing a successful transaction. In the latter
+                    // case, it's the transaction itself. In the former, it's a separate object that
+                    // serves notice that something has occurred. A notice, for example, does not
+                    // contain a balance agreement. So you couldn't say it's a "successful transaction"
+                    // even though it is serving notice to various parties that a cron item was successfully
+                    // (or not) activated.)
+                    // -------------------------------------------
                     ++nIndex; // 0 on first iteration.
                     otInfo << __FUNCTION__
                           << ": Expired payment RECORD index: " << nIndex
@@ -2317,8 +2359,23 @@ bool OTRecordList::Populate()
                     std::string str_other_nym_id;
                     std::string str_other_acct_id;
 
+                    OTRecord::OTRecordType recordType = OTRecord::Instrument;
+
                     if (!pBoxTrans->IsAbbreviated())
                     {
+                        // We ignore the return value of GetSuccess, since it's not
+                        // detailed enough for our needs here.
+                        //
+                        pBoxTrans->GetSuccess(&bHasSuccess, &bIsSuccess);
+                        
+                        if (OTTransaction::notice == pBoxTrans->GetType())
+                        {
+                            recordType = OTRecord::Notice;
+                         
+                            if (pBoxTrans->IsCancelled())
+                                bCanceled = true;
+                        }
+                        // ----------------------------------------
                         Identifier theSenderID, theSenderAcctID;
                         Identifier theRecipientID, theRecipientAcctID;
 
@@ -2337,6 +2394,7 @@ bool OTRecordList::Populate()
                             {
                                 if (OTTransaction::notice == pBoxTrans->GetType())
                                     bOutgoing = false; // Payment Plan "sender" of funds (payer) is the recipient of the plan.
+                                                       // TODO: Smart contracts?
                                 else
                                     bOutgoing = true; // if Nym is the sender, then it must have been outgoing.
 
@@ -2368,6 +2426,7 @@ bool OTRecordList::Populate()
 
                                 if (OTTransaction::notice == pBoxTrans->GetType())
                                     bOutgoing = true; // Payment Plan "recipient" of funds (merchant) is the sender of the plan.
+                                                      // TODO: Smart contracts?
                                 else
                                     bOutgoing = false;
 
@@ -2404,6 +2463,7 @@ bool OTRecordList::Populate()
                                 
                                 if (OTTransaction::notice == pBoxTrans->GetType())
                                     bOutgoing = false; // Payment Plan "sender" of funds (payer) is the recipient of the plan.
+                                                       // TODO: Smart contracts?
                                 else
                                     bOutgoing = true; // if Nym is the sender, then it must have been outgoing.
 
@@ -2627,12 +2687,14 @@ bool OTRecordList::Populate()
                         bOutgoing, // Since it's the recordbox, it contains both incoming and outgoing receipts.
                         true,      // IsRecord
                         false,     // IsReceipt,
-                        OTRecord::Instrument));
+                        recordType));
                     if (strContents.Exists())
                         sp_Record->SetContents(strContents.Get());
+                    
                     sp_Record->SetDateRange(tValidFrom, tValidTo);
                     sp_Record->SetExpired();
                     sp_Record->SetBoxIndex(nIndex);
+                    
                     if (!str_memo.empty()) sp_Record->SetMemo(str_memo);
                     if (!str_other_nym_id.empty())
                         sp_Record->SetOtherNymID(str_other_nym_id);
@@ -2645,6 +2707,12 @@ bool OTRecordList::Populate()
                         sp_Record->SetTransNumForDisplay(pBoxTrans->GetReferenceNumForDisplay());
                     sp_Record->SetTransactionNum(pBoxTrans->GetTransactionNum());
 
+                    if (bHasSuccess)
+                        sp_Record->SetSuccess(bIsSuccess);
+                    
+                    if (bCanceled)
+                        sp_Record->SetCanceled();
+                    
                     m_contents.push_back(sp_Record);
 
                 } // Loop through ExpiredBox
@@ -2731,12 +2799,9 @@ bool OTRecordList::Populate()
         // Loop through asset account INBOX.
         //
         // OPTIMIZE FYI:
-        // NOTE: LoadInbox is much SLOWER than LoadInboxNoVerify, but it also
-        // lets you get
-        // the NAME off of the box receipt. So if you are willing to GIVE UP the
-        // NAME, in
-        // return for FASTER PERFORMANCE, then call SetFastMode() before
-        // Populating.
+        // NOTE: LoadInbox is much SLOWER than LoadInboxNoVerify, but it also lets you get
+        // the NAME off of the box receipt. So if you are willing to GIVE UP the NAME, in
+        // return for FASTER PERFORMANCE, then call SetFastMode() before Populating.
         //
         Ledger* pInbox = m_bRunFast
                              ? OTAPI_Wrap::OTAPI()->LoadInboxNoVerify(
@@ -2759,26 +2824,28 @@ bool OTRecordList::Populate()
                 otInfo << __FUNCTION__ << ": Inbox index: " << nInboxIndex
                       << "\n";
                 bool bCanceled = false;
-                std::string str_name; // name of sender (since its in the
-                                      // inbox.)
+                std::string str_name; // name of sender (since its in the inbox.)
                 std::string str_other_nym_id;
                 std::string str_other_acct_id;
                 std::string str_memo;
 
-                if (!pBoxTrans->IsAbbreviated()) {
+                bool bHasSuccess = false;
+                bool bIsSuccess  = false;
+                
+                if (!pBoxTrans->IsAbbreviated())
+                {
                     String strMemo;
 
-                    if (pBoxTrans->GetMemo(strMemo)) str_memo = strMemo.Get();
+                    if (pBoxTrans->GetMemo(strMemo))
+                        str_memo = strMemo.Get();
+                    
                     if (OTTransaction::pending == pBoxTrans->GetType()) {
                         // NOTE: REMOVE THE BELOW CODE. (Found a better way,
                         // above this block.)
-                        //                    const OTString
-                        // strBoxTrans(*pBoxTrans);
-                        //
-                        //                    if (strBoxTrans.Exists())
-                        //                        str_memo =
-                        // OTAPI_Wrap::Pending_GetNote(*pstr_notary_id,
-                        // *pstr_nym_id, str_account_id, strBoxTrans.Get());
+//                      const OTString strBoxTrans(*pBoxTrans);
+//                      if (strBoxTrans.Exists())
+//                         str_memo = OTAPI_Wrap::Pending_GetNote(*pstr_notary_id,
+//                                                                *pstr_nym_id, str_account_id, strBoxTrans.Get());
                         Identifier theSenderID, theSenderAcctID;
 
                         if (pBoxTrans->GetSenderAcctIDForDisplay(
@@ -2799,10 +2866,7 @@ bool OTRecordList::Populate()
                                 str_other_acct_id,
                                 str_other_nym_id, // nym ID if known
                                 *pstr_notary_id,  // server ID if known.
-                                *pstr_instrument_definition_id)), // instrument
-                                                                  // definition
-                                                                  // id if
-                                                                  // known.
+                                *pstr_instrument_definition_id)), // instrument definition id if known.
                                 strNameTemp;
 
                             if (strName.Exists()) {
@@ -2863,6 +2927,8 @@ bool OTRecordList::Populate()
                     }    // end: (if pending)
                     else // else it's a receipt.
                     {
+                        pBoxTrans->GetSuccess(&bHasSuccess, &bIsSuccess);
+                        // -------------------------------
                         Identifier theRecipientID, theRecipientAcctID;
 
                         if (pBoxTrans->GetRecipientNymIDForDisplay(
@@ -2892,8 +2958,8 @@ bool OTRecordList::Populate()
                                 str_other_acct_id = strRecipientAcctID.Get();
                             }
                         }
-                        else if (pBoxTrans->GetRecipientAcctIDForDisplay(
-                                       theRecipientAcctID)) {
+                        else if (pBoxTrans->GetRecipientAcctIDForDisplay(theRecipientAcctID))
+                        {
                             const String strRecipientAcctID(theRecipientAcctID);
                             const std::string str_recipient_acct_id(
                                 strRecipientAcctID.Get());
@@ -2902,10 +2968,7 @@ bool OTRecordList::Populate()
                                 str_recipient_acct_id,
                                 "",              // nym ID if known
                                 *pstr_notary_id, // server ID if known.
-                                *pstr_instrument_definition_id)), // instrument
-                                                                  // definition
-                                                                  // id if
-                                                                  // known.
+                                *pstr_instrument_definition_id)), // instrument definition id if known.
                                 strNameTemp;
 
                             if (strName.Exists())
@@ -2957,42 +3020,43 @@ bool OTRecordList::Populate()
                     *pstr_asset_name,
                     *pstr_nym_id,   // This is the Nym WHOSE BOX IT IS.
                     str_account_id, // This is the Nym's account for this box.
-                    // Everything above this line, it stores a reference to an
-                    // external string.
-                    // Everything below this line, it makes its own internal
-                    // copy of the string.
+                    // Everything above this line, it stores a reference to an external string.
+                    // Everything below this line, it makes its own internal copy of the string.
                     str_name, // name of sender (since its in the inbox.)
                     str_date, // the "valid from" date on the instrument.
                     str_amount, str_type, // pending, chequeReceipt, etc.
-                    (OTTransaction::pending ==
-                     pBoxTrans->GetType()), // Sometimes true, often false.
-                    (lAmount < 0) ? true : false, // bIsOutgoing (this is the
-                                                  // inbox, but a
-                    // transferReceipt in the inbox represents
-                    // outgoing funds. Whereas a "pending" in the
-                    // inbox represents incoming funds. For now I'm
-                    // just going to go based on whether the amount
-                    // is negative or not, to determine incoming /
-                    // outgoing. We'll see how that works.)
+                    (OTTransaction::pending == pBoxTrans->GetType()), // Sometimes true, often false.
+                    (lAmount < 0) ? true : false, // bIsOutgoing (this is the inbox, but a
+                                                  // transferReceipt in the inbox represents
+                                                  // outgoing funds. Whereas a "pending" in the
+                                                  // inbox represents incoming funds. For now I'm
+                                                  // just going to go based on whether the amount
+                                                  // is negative or not, to determine incoming /
+                                                  // outgoing. We'll see how that works.)
                     false, // IsRecord
-                    (OTTransaction::pending !=
-                     pBoxTrans->GetType()), // IsReceipt,
+                    (OTTransaction::pending != pBoxTrans->GetType()), // IsReceipt,
                     (OTTransaction::pending == pBoxTrans->GetType())
                         ? OTRecord::Transfer
                         : OTRecord::Receipt));
+                
                 const String strContents(*pBoxTrans);
                 sp_Record->SetContents(strContents.Get());
                 sp_Record->SetDateRange(tValidFrom, tValidTo);
                 sp_Record->SetBoxIndex(nInboxIndex);
+                
                 if (bCanceled) sp_Record->SetCanceled();
                 if (!str_memo.empty()) sp_Record->SetMemo(str_memo);
                 if (!str_other_nym_id.empty())
                     sp_Record->SetOtherNymID(str_other_nym_id);
                 if (!str_other_acct_id.empty())
                     sp_Record->SetOtherAccountID(str_other_acct_id);
+                
                 sp_Record->SetTransNumForDisplay(
                     pBoxTrans->GetReferenceNumForDisplay());
                 sp_Record->SetTransactionNum(pBoxTrans->GetTransactionNum());
+                
+                if (bHasSuccess)
+                    sp_Record->SetSuccess(bIsSuccess);
                 
 //                otErr << "DEBUGGING! Added " << pBoxTrans->GetTypeString() <<
 //                "\n pBoxTrans->GetTransactionNum(): " << pBoxTrans->GetTransactionNum() <<
@@ -3002,12 +3066,9 @@ bool OTRecordList::Populate()
             }
         }
         // OPTIMIZE FYI:
-        // NOTE: LoadOutbox is much SLOWER than LoadOutboxNoVerify, but it also
-        // lets you get
-        // the NAME off of the box receipt. So if you are willing to GIVE UP the
-        // NAME, in
-        // return for FASTER PERFORMANCE, then call SetFastMode() before running
-        // Populate.
+        // NOTE: LoadOutbox is much SLOWER than LoadOutboxNoVerify, but it also lets you get
+        // the NAME off of the box receipt. So if you are willing to GIVE UP the NAME, in
+        // return for FASTER PERFORMANCE, then call SetFastMode() before running Populate.
         //
         Ledger* pOutbox = m_bRunFast
                               ? OTAPI_Wrap::OTAPI()->LoadOutboxNoVerify(
@@ -3150,9 +3211,7 @@ bool OTRecordList::Populate()
                     str_name, // name of recipient (since its in the outbox.)
                     str_date, // the "valid from" date on the instrument.
                     str_amount, str_type, // pending, chequeReceipt, etc.
-                    (OTTransaction::pending ==
-                     pBoxTrans->GetType()), // Basically always true, in this
-                                            // case.
+                    (OTTransaction::pending == pBoxTrans->GetType()), // Basically always true, in this case.
                     true,  // bIsOutgoing=true. (Since this is the outbox...)
                     false, // IsRecord
                     false, // IsReceipt
@@ -3170,11 +3229,10 @@ bool OTRecordList::Populate()
                     pBoxTrans->GetReferenceNumForDisplay());
                 sp_Record->SetTransactionNum(pBoxTrans->GetTransactionNum());
                 
-                
-                otErr << "DEBUGGING! Added outgoing asset account record: " <<
-                pBoxTrans->GetTypeString() <<
-                "\n pBoxTrans->GetTransactionNum(): " << pBoxTrans->GetTransactionNum() <<
-                "\n pBoxTrans->GetReferenceNumForDisplay()" << pBoxTrans->GetReferenceNumForDisplay() << "\n";
+//                otErr << "DEBUGGING! Added outgoing asset account record: " <<
+//                pBoxTrans->GetTypeString() <<
+//                "\n pBoxTrans->GetTransactionNum(): " << pBoxTrans->GetTransactionNum() <<
+//                "\n pBoxTrans->GetReferenceNumForDisplay()" << pBoxTrans->GetReferenceNumForDisplay() << "\n";
                 
 
                 m_contents.push_back(sp_Record);
@@ -3184,12 +3242,9 @@ bool OTRecordList::Populate()
         // since it's the recordbox for a specific account.
         //
         // OPTIMIZE FYI:
-        // NOTE: LoadRecordBox is much SLOWER than LoadRecordBoxNoVerify, but it
-        // also lets you get
-        // the NAME off of the box receipt. So if you are willing to GIVE UP the
-        // NAME, in
-        // return for FASTER PERFORMANCE, then call SetFastMode() before
-        // Populating.
+        // NOTE: LoadRecordBox is much SLOWER than LoadRecordBoxNoVerify, but it also lets you get
+        // the NAME off of the box receipt. So if you are willing to GIVE UP the NAME, in
+        // return for FASTER PERFORMANCE, then call SetFastMode() before Populating.
         //
         Ledger* pRecordbox = m_bRunFast
                                  ? OTAPI_Wrap::OTAPI()->LoadRecordBoxNoVerify(
@@ -3215,8 +3270,15 @@ bool OTRecordList::Populate()
                 std::string str_other_nym_id;
                 std::string str_other_acct_id;
                 std::string str_memo;
+                
+                bool bHasSuccess = false;
+                bool bIsSuccess  = false;
 
-                if (!pBoxTrans->IsAbbreviated()) {
+                if (!pBoxTrans->IsAbbreviated())
+                {
+                    if (pBoxTrans->GetType() != OTTransaction::pending)
+                        pBoxTrans->GetSuccess(&bHasSuccess, &bIsSuccess);
+                    // ----------------------------------------
                     Identifier theSenderID, theSenderAcctID;
                     Identifier theRecipientID, theRecipientAcctID;
 
@@ -3225,14 +3287,10 @@ bool OTRecordList::Populate()
                         const std::string str_sender_acct_id(
                             strSenderAcctID.Get());
 
-                        // Usually, Nym is the RECIPIENT. Sometimes he's the
-                        // sender.
-                        // Either way, we want the OTHER ID (the other Nym) for
-                        // display.
-                        // So here, if Nym's CLEARLY the sender, then we want
-                        // the RECIPIENT.
-                        // Whereas if Nym were the recipient, then we'd want the
-                        // SENDER. (For display.)
+                        // Usually, Nym is the RECIPIENT. Sometimes he's the sender.
+                        // Either way, we want the OTHER ID (the other Nym) for display.
+                        // So here, if Nym's CLEARLY the sender, then we want the RECIPIENT.
+                        // Whereas if Nym were the recipient, then we'd want the SENDER. (For display.)
                         //
                         if (0 ==
                             str_account_id.compare(
@@ -3245,15 +3303,12 @@ bool OTRecordList::Populate()
                                               // must have been outgoing.
 
                             const bool bGotRecipientNymIDForDisplay =
-                                pBoxTrans->GetRecipientNymIDForDisplay(
-                                    theRecipientID);
+                                pBoxTrans->GetRecipientNymIDForDisplay(theRecipientID);
 
-                            if (pBoxTrans->GetRecipientAcctIDForDisplay(
-                                    theRecipientAcctID)) {
-                                const String strRecipientAcctID(
-                                    theRecipientAcctID);
-                                const std::string str_recip_acct_id(
-                                    strRecipientAcctID.Get());
+                            if (pBoxTrans->GetRecipientAcctIDForDisplay(theRecipientAcctID))
+                            {
+                                const String strRecipientAcctID    (theRecipientAcctID);
+                                const std::string str_recip_acct_id(strRecipientAcctID.Get());
 
                                 String strRecipientNymID("");
                                 std::string str_recip_nym_id("");
@@ -3262,67 +3317,48 @@ bool OTRecordList::Populate()
                                     theRecipientID.GetString(strRecipientNymID);
                                     str_recip_nym_id = strRecipientNymID.Get();
                                 }
-                                // NOTE: We check for cancelled here so we don't
-                                // accidentally
-                                // cause the address book to falsely believe
-                                // that str_recip_nym_id
-                                // is the owner of str_recip_acct_id. (If the
-                                // cheque/invoice is cancelled,
-                                // the recipient account will be the sender
-                                // account, which is NOT owned
+                                // NOTE: We check for cancelled here so we don't accidentally
+                                // cause the address book to falsely believe that str_recip_nym_id
+                                // is the owner of str_recip_acct_id. (If the cheque/invoice is cancelled,
+                                // the recipient account will be the sender account, which is NOT owned
                                 // by the recipient, obviously...)
                                 //
-                                if (!pBoxTrans->IsCancelled()) {
+                                if (!pBoxTrans->IsCancelled())
+                                {
                                     String strName(m_pLookup->GetAcctName(
                                         str_recip_acct_id,
-                                        // NOTE: we CANNOT pass
-                                        // str_recip_nym_id here with
-                                        // str_recip_acct_id
-                                        // if it's a cancelled instrument, since
-                                        // in that case, the SENDER ACCT
-                                        // is ALSO the RECIPIENT ACCT. So this
-                                        // logic is ONLY correct since we
-                                        // are inside the block of if
-                                        // (!pBoxTrans->IsCancelled())
-                                        // (Otherwise we'd be training the
-                                        // address book to falsely believe that
-                                        // the recipient Nym is the owner of the
-                                        // sender acct.)
+                                        // NOTE: we CANNOT pass str_recip_nym_id here with str_recip_acct_id
+                                        // if it's a cancelled instrument, since in that case, the SENDER ACCT
+                                        // is ALSO the RECIPIENT ACCT. So this logic is ONLY correct since we
+                                        // are inside the block of if (!pBoxTrans->IsCancelled())
+                                        // (Otherwise we'd be training the address book to falsely believe that
+                                        // the recipient Nym is the owner of the sender acct.)
                                         bGotRecipientNymIDForDisplay
                                             ? str_recip_nym_id
                                             : "",        // nym ID if known
                                         *pstr_notary_id, // server ID if known.
-                                        *pstr_instrument_definition_id)), // asset
-                                                                          // ID
-                                                                          // if
-                                        // known.
+                                        *pstr_instrument_definition_id)), // asset ID if known.
                                         strNameTemp;
 
                                     if (strName.Exists())
-                                        strNameTemp.Format(
-                                            OTRecordList::textTo(),
-                                            strName.Get());
+                                        strNameTemp.Format(OTRecordList::textTo(), strName.Get());
                                     else
-                                        strNameTemp.Format(
-                                            OTRecordList::textTo(),
-                                            str_recip_acct_id.c_str());
+                                        strNameTemp.Format(OTRecordList::textTo(), str_recip_acct_id.c_str());
 
                                     str_name =
-                                        strNameTemp.Get(); // We don't want to
-                                                           // see our own name
-                                                           // on cancelled
-                                                           // cheques.
+                                        strNameTemp.Get(); // We don't want to see our own name on cancelled cheques.
                                 }
                                 str_other_acct_id = str_recip_acct_id;
                             }
-                            if (bGotRecipientNymIDForDisplay) {
-                                const String strRecipientID(theRecipientID);
-                                const std::string str_recipient_id(
-                                    strRecipientID.Get());
+                            if (bGotRecipientNymIDForDisplay)
+                            {
+                                const String strRecipientID       (theRecipientID);
+                                const std::string str_recipient_id(strRecipientID.Get());
 
                                 str_other_nym_id = str_recipient_id;
 
-                                if (str_name.empty()) {
+                                if (str_name.empty())
+                                {
                                     String strName(m_pLookup->GetNymName(
                                         str_recipient_id, *it_server)),
                                         strNameTemp;
@@ -3341,14 +3377,12 @@ bool OTRecordList::Populate()
                             }
                         }
                         else // str_account_id IS NOT str_sender_acct_id.
-                               // (Therefore we want sender.)
+                             // (Therefore we want sender.)
                         { // In this case, some OTHER Nym is the sender, so it
-                            // must have been incoming. (And bOutgoing is
-                            // already
-                            // false.)
+                          // must have been incoming. (And bOutgoing is already false.)
 
-                            if (pBoxTrans->GetSenderNymIDForDisplay(
-                                    theSenderID)) {
+                            if (pBoxTrans->GetSenderNymIDForDisplay(theSenderID))
+                            {
                                 const String strSenderNymID(theSenderID);
                                 str_other_nym_id = strSenderNymID.Get();
                             }
@@ -3356,18 +3390,13 @@ bool OTRecordList::Populate()
                                 str_sender_acct_id,
                                 str_other_nym_id, // nym ID if known
                                 *pstr_notary_id,  // server ID if known.
-                                *pstr_instrument_definition_id)), // instrument
-                                                                  // definition
-                                                                  // id if
-                                                                  // known.
+                                *pstr_instrument_definition_id)), // instrument definition id if known.
                                 strNameTemp;
 
                             if (strName.Exists())
-                                strNameTemp.Format(OTRecordList::textFrom(),
-                                                   strName.Get());
+                                strNameTemp.Format(OTRecordList::textFrom(), strName.Get());
                             else
-                                strNameTemp.Format(OTRecordList::textFrom(),
-                                                   str_sender_acct_id.c_str());
+                                strNameTemp.Format(OTRecordList::textFrom(), str_sender_acct_id.c_str());
 
                             str_name = strNameTemp.Get();
                             str_other_acct_id = str_sender_acct_id;
@@ -3376,29 +3405,23 @@ bool OTRecordList::Populate()
                     // In this block below, we already KNOW
                     // GetSenderAcctIDForDisplay is EMPTY.
                     // (So it's "recipient or bust.")
-                    else if (pBoxTrans->GetRecipientAcctIDForDisplay(
-                                 theRecipientAcctID)) {
-                        if (pBoxTrans->GetRecipientNymIDForDisplay(
-                                theRecipientID)) {
-                            const String strRecipientID(theRecipientID);
-                            const std::string str_recipient_nym_id(
-                                strRecipientID.Get());
+                    else if (pBoxTrans->GetRecipientAcctIDForDisplay(theRecipientAcctID))
+                    {
+                        if (pBoxTrans->GetRecipientNymIDForDisplay(theRecipientID))
+                        {
+                            const String strRecipientID           (theRecipientID);
+                            const std::string str_recipient_nym_id(strRecipientID.Get());
 
                             str_other_nym_id = str_recipient_nym_id;
                         }
-                        const String strRecipientAcctID(theRecipientAcctID);
-                        const std::string str_recipient_acct_id(
-                            strRecipientAcctID.Get());
+                        const String strRecipientAcctID        (theRecipientAcctID);
+                        const std::string str_recipient_acct_id(strRecipientAcctID.Get());
 
                         if (0 !=
                             str_account_id.compare(
-                                str_recipient_acct_id)) // str_account_id is NOT
-                        // str_recipient_acct_id.
-                        // (Therefore we want
-                        // str_recipient_acct_id.)
-                        {
-                            // If Nym is not the recipient, then he must be the
-                            // sender.
+                                str_recipient_acct_id)) // str_account_id is NOT str_recipient_acct_id.
+                        {                               // (Therefore we want str_recipient_acct_id.)
+                            // If Nym is not the recipient, then he must be the sender.
                             // (Therefore it must be outgoing.)
                             bOutgoing = true;
 
@@ -3424,81 +3447,61 @@ bool OTRecordList::Populate()
                             str_other_acct_id = str_recipient_acct_id;
                         }
                     }
-                    else if (pBoxTrans->GetSenderNymIDForDisplay(
-                                   theSenderID)) {
+                    else if (pBoxTrans->GetSenderNymIDForDisplay(theSenderID))
+                    {
                         const String strSenderID(theSenderID);
                         const std::string str_sender_id(strSenderID.Get());
 
-                        // Usually, Nym is the RECIPIENT. Sometimes he's the
-                        // sender.
-                        // Either way, we want the OTHER ID (the other Nym) for
-                        // display.
-                        // So here, if Nym's CLEARLY the sender, then we want
-                        // the RECIPIENT.
-                        // Whereas if Nym were the recipient, then we'd want the
-                        // SENDER. (For display.)
+                        // Usually, Nym is the RECIPIENT. Sometimes he's the sender.
+                        // Either way, we want the OTHER ID (the other Nym) for display.
+                        // So here, if Nym's CLEARLY the sender, then we want the RECIPIENT.
+                        // Whereas if Nym were the recipient, then we'd want the SENDER. (For display.)
                         //
                         if (0 ==
-                            str_nym_id.compare(str_sender_id)) // str_nym_id IS
-                                                               // str_sender_id.
-                                                               // (Therefore we
-                                                               // want
-                                                               // recipient.)
+                            str_nym_id.compare(str_sender_id)) // str_nym_id IS str_sender_id.
+                                                               // (Therefore we want recipient.)
                         {
                             bOutgoing = true; // if Nym is the sender, then it
                                               // must have been outgoing.
 
                             if (pBoxTrans->GetRecipientNymIDForDisplay(
                                     theRecipientID)) {
-                                const String strRecipientID(theRecipientID);
-                                const std::string str_recipient_id(
-                                    strRecipientID.Get());
+                                const String strRecipientID       (theRecipientID);
+                                const std::string str_recipient_id(strRecipientID.Get());
 
-                                String strName(m_pLookup->GetNymName(
-                                    str_recipient_id, *it_server)),
-                                    strNameTemp;
+                                String strName(m_pLookup->GetNymName(str_recipient_id, *it_server)),
+                                       strNameTemp;
 
                                 if (strName.Exists())
-                                    strNameTemp.Format(OTRecordList::textTo(),
-                                                       strName.Get());
+                                    strNameTemp.Format(OTRecordList::textTo(), strName.Get());
                                 else
-                                    strNameTemp.Format(
-                                        OTRecordList::textTo(),
-                                        str_recipient_id.c_str());
+                                    strNameTemp.Format(OTRecordList::textTo(), str_recipient_id.c_str());
 
                                 str_name = strNameTemp.Get();
                                 str_other_nym_id = str_recipient_id;
-                                if (pBoxTrans->GetRecipientAcctIDForDisplay(
-                                        theRecipientAcctID)) {
-                                    const String strRecipientAcctID(
-                                        theRecipientAcctID);
-                                    str_other_acct_id =
-                                        strRecipientAcctID.Get();
+                                if (pBoxTrans->GetRecipientAcctIDForDisplay(theRecipientAcctID))
+                                {
+                                    const String strRecipientAcctID(theRecipientAcctID);
+                                    str_other_acct_id = strRecipientAcctID.Get();
                                 }
                             }
                         }
-                        else // str_nym_id IS NOT str_sender_id. (Therefore we
-                               // want sender.)
+                        else // str_nym_id IS NOT str_sender_id. (Therefore we want sender.)
                         { // In this case, some OTHER Nym is the sender, so it
-                            // must have been incoming. (And bOutgoing is
-                            // already
-                            // false.)
+                          // must have been incoming. (And bOutgoing is already false.)
 
-                            String strName(m_pLookup->GetNymName(str_sender_id,
-                                                                 *it_server)),
-                                strNameTemp;
+                            String strName(m_pLookup->GetNymName(str_sender_id, *it_server)),
+                                   strNameTemp;
 
                             if (strName.Exists())
-                                strNameTemp.Format(OTRecordList::textFrom(),
-                                                   strName.Get());
+                                strNameTemp.Format(OTRecordList::textFrom(), strName.Get());
                             else
-                                strNameTemp.Format(OTRecordList::textFrom(),
-                                                   str_sender_id.c_str());
+                                strNameTemp.Format(OTRecordList::textFrom(), str_sender_id.c_str());
 
                             str_name = strNameTemp.Get();
                             str_other_nym_id = str_sender_id;
-                            if (pBoxTrans->GetSenderAcctIDForDisplay(
-                                    theSenderAcctID)) {
+                            if (pBoxTrans->GetSenderAcctIDForDisplay(theSenderAcctID))
+                            {
                                 const String strSenderAcctID(theSenderAcctID);
                                 str_other_acct_id = strSenderAcctID.Get();
                             }
@@ -3507,41 +3510,31 @@ bool OTRecordList::Populate()
                     // In this block below, we already KNOW
                     // GetSenderNymIDForDisplay is EMPTY.
                     // (So it's "recipient or bust.")
-                    else if (pBoxTrans->GetRecipientNymIDForDisplay(
-                                 theRecipientID)) {
-                        const String strRecipientID(theRecipientID);
-                        const std::string str_recipient_id(
-                            strRecipientID.Get());
+                    else if (pBoxTrans->GetRecipientNymIDForDisplay(theRecipientID))
+                    {
+                        const String strRecipientID       (theRecipientID);
+                        const std::string str_recipient_id(strRecipientID.Get());
 
                         if (0 !=
-                            str_nym_id.compare(str_recipient_id)) // str_nym_id
-                                                                  // is NOT
-                        // str_recipient_id.
-                        // (Therefore we want
-                        // str_recipient_id.)
-                        {
-                            // If Nym is not the recipient, then he must be the
-                            // sender.
+                            str_nym_id.compare(str_recipient_id)) // str_nym_id is NOT str_recipient_id.
+                        {                                         // (Therefore we want str_recipient_id.)
+                            // If Nym is not the recipient, then he must be the sender.
                             // (Therefore it must be outgoing.)
                             bOutgoing = true;
 
-                            String strName(m_pLookup->GetNymName(
-                                str_recipient_id, *it_server)),
-                                strNameTemp;
+                            String strName(m_pLookup->GetNymName(str_recipient_id, *it_server)),
+                                   strNameTemp;
 
                             if (strName.Exists())
-                                strNameTemp.Format(OTRecordList::textTo(),
-                                                   strName.Get());
+                                strNameTemp.Format(OTRecordList::textTo(), strName.Get());
                             else
-                                strNameTemp.Format(OTRecordList::textTo(),
-                                                   str_recipient_id.c_str());
+                                strNameTemp.Format(OTRecordList::textTo(), str_recipient_id.c_str());
 
                             str_name = strNameTemp.Get();
                             str_other_nym_id = str_recipient_id;
-                            if (pBoxTrans->GetRecipientAcctIDForDisplay(
-                                    theRecipientAcctID)) {
-                                const String strRecipientAcctID(
-                                    theRecipientAcctID);
+                            if (pBoxTrans->GetRecipientAcctIDForDisplay(theRecipientAcctID))
+                            {
+                                const String strRecipientAcctID(theRecipientAcctID);
                                 str_other_acct_id = strRecipientAcctID.Get();
                             }
                         }
@@ -3582,19 +3575,16 @@ bool OTRecordList::Populate()
                                        // have a pending in his recordbox.
                 if (0 != lAmount) {
 
-                    //                if (lAmount < 0)
-                    //                    bOutgoing = true;
-                    //                else
-                    //                    bOutgoing = false;
+//              if (lAmount < 0)
+//                  bOutgoing = true;
+//              else
+//                  bOutgoing = false;
 
-                    // A transfer receipt ALWAYS represents an outgoing
-                    // transfer.
-                    // If the amount is over 0, we want to display it as a
-                    // negative
-                    // since it represents money LEAVING my account.
-                    //                if ((0 ==
-                    // str_type.compare("transferReceipt")) && (lAmount > 0))
-                    //                    lAmount *= (-1);
+                // A transfer receipt ALWAYS represents an outgoing transfer.
+                // If the amount is over 0, we want to display it as a negative
+                // since it represents money LEAVING my account.
+//              if ((0 == str_type.compare("transferReceipt")) && (lAmount > 0))
+//                  lAmount *= (-1);
 
                     String strTemp;
                     strTemp.Format("%" PRId64 "", lAmount);
@@ -3606,10 +3596,8 @@ bool OTRecordList::Populate()
                               : (bOutgoing ? "sent" : "received"))
                       << " (asset account) record (str_type: "
                       << str_type.c_str() << ")\n";
-                // This line means: If it's a receipt, use a blank string.
-                // Otherwise if
-                // it's a transfer, then show sent/received. (This is the
-                // record box, so
+                // This line means: If it's a receipt, use a blank string. Otherwise if
+                // it's a transfer, then show sent/received. (This is the record box, so
                 // if it's a transfer, it's a completed one.)
                 //
                 // FYI, for Receipts we don't say "sent transferReceipt",
@@ -3650,6 +3638,9 @@ bool OTRecordList::Populate()
                 sp_Record->SetTransNumForDisplay(
                     pBoxTrans->GetReferenceNumForDisplay());
                 sp_Record->SetTransactionNum(pBoxTrans->GetTransactionNum());
+                
+                if (bHasSuccess)
+                    sp_Record->SetSuccess(bIsSuccess);
                 
 //                otErr << "DEBUGGING! Added " << (bOutgoing ? "sent": "received") << " asset account record: " <<
 //                pBoxTrans->GetTypeString() <<

@@ -57,308 +57,226 @@ private: // Private prevents erroneous use by other classes.
 
 protected:
     // keeping constructor protected in order to force people to use the other
-    // constructors and
-    // therefore provide the requisite IDs.
+    // constructors and therefore provide the requisite IDs.
     OTTransactionType();
 
-    // Basically what I want here is, SERVER ID and ACCOUNT ID.
-    // That way, all the child classes can also have a server ID and account ID,
-    // and they can compare to the internal ones to make sure they match.
-    // This class centralizes that mechanism so I'm not duplicating it three or
+    // Basically what I want here is, SERVER ID and ACCOUNT ID. That way,
+    // all the child classes can also have a server ID and account ID, and
+    // they can compare to the internal ones to make sure they match. This
+    // class centralizes that mechanism so I'm not duplicating it three or
     // four times.
     //
     // So I need the SERVER ID and the ACCOUNT ID stored here.
     //
     // Fortunately, Contract already handles the ID, which is the Account ID
-    // in
-    // the context of all transaction objects. If your "bank account" is acct
-    // #350, then
+    // in the context of all transaction objects. If your "bank account" is
+    // acct #350, then
     // ALL of your transactions will have m_ID of #350 as a rule, and once
-    // loaded from
-    // storage and signature verified, m_AcctID should also contain #350. The
-    // transaction
-    // number is a separate value, m_lTransactionNum, which uniquely identifies
-    // a transaction.
-    // The idea is to prevent a file from loading up into the same variable and
-    // overwriting
-    // what we expected with a new value that we didn't expect (and that perhaps
-    // has a good
-    // signature on it, but from some other account, etc). A transaction can
-    // ONLY be generated
-    // properly (using a transaction # that was already signed out to you, yadda
-    // yadda yadda)
-    // OR it can be an existing transaction being loaded from string or storage.
-    // Since transactions
-    // are nested (with a ledger containing a list of transactions, each
-    // containing a list of
-    // items) then we always know WHICH VALUES we are EXPECTING, out of any of
-    // these objects,
-    // BEFORE they are loaded into memory. (For account ID, server ID, user ID.)
-    // We set those
-    // values when INSTANTIATING the objects, BEFORE they have been loaded. ===>
-    // Then the loading
-    // occurs, and we see the server ID, acct ID, user ID, etc that were
-    // ACTUALLY in the file,
-    // whose signature we have now verified, stored as SEPARATE VALUES, so we
-    // can compare.
-    // After loading there is a separate, "VERIFY" process, where a transaction
-    // type can be
-    // verified, make sure all the right IDs are in order, etc.
-    // Why is this important? Primarily because these IDs *are* set, for most
-    // objects, before
-    // they are loaded, and they should NEVER be different than what they are
-    // set to at the
-    // time they were FIRST GENERATED. (Loading should only faithfully copy
-    // them, thereafter.)
-    // However, once they are loaded, we shall see what they really are -- and
-    // we should not
-    // accidentally propagate new and different values under our own signature,
-    // in some future
-    // receipt, if they were to be somehow substituted during the loading phase.
-    // Remember that
-    // these objects are nestable. Sometimes an individual transaction item is
-    // later individually
-    // tacked onto someone else's receipt. For example, when someone deposits
-    // your cheque, drawn
-    // from one of your accounts, you will not get his entire "depositCheque"
-    // transaction attached
-    // to the chequeReceipt in your inbox. That original transaction #3 (say)
-    // not only included a
-    // "depositCheque" transaction item, also #3, (and also for the same acct#
-    // and server# etc)
-    // but it also included a "balance agreement" transaction item, necessary
-    // for proving his
-    // balance at the time of the transaction, and for proving (between him and
-    // the server) which
-    // of his transactions had already cleared, and which instruments were
-    // valid. This is part
-    // of the mechanism that makes destruction of account history possible.
-    // Every transaction
-    // request must be accompanied by a signed balance agreement, which has the
-    // same acct # and
-    // server # and transaction # as the main transaction and all the other
-    // transaction items.
-    // BUT WHAT BUSINSESS IS IT OF YOURS the information that appears on his
-    // balance agreement?
-    // Just because he deposited your cheque, now you should have access to his
-    // entire balance
-    // agreement? No, because a copy of his transaction is not what appears on
-    // your chequeReceipt.
-    // Rather, the individual "depositCheque" transaction item is what appears
-    // on your receipt,
-    // not any of the other transaction items (such as the balance agreement)
-    // and not a copy
-    // of the overall depositCheque transaction itself, that he originally
-    // submitted to the
-    // server. Fortunately, each individual transaction item is signed, and is
-    // verified to have
-    // all the same IDs as the overall transaction that it belongs to. And while
-    // although there are
-    // individual transaction items for any given transaction#, there is only a
-    // single transaction.
-    // And no item can ever be substituted onto another transaction without
-    // failing this verification,
-    // since the IDs wouldn't match--just as none of the IDs themselves can be
-    // changed later without
-    // failing the signature verification. No transaction ID can be used to
-    // change your balance, without
-    // a corresponding receipt appearing in your inbox (signed by you) to
-    // compensate for the change
-    // in balance. The same instrument cannot be used to change your balance
-    // twice, because two
-    // balance changes (double the amount authorized) must necessarily be
-    // accompanied by two inbox
-    // receipts, signed by you, authorizing each balance change. The same ID
-    // cannot appear twice in your inbox
-    // without giving itself away (and provably so, since it appears on every
-    // receipt) and clearly
-    // you could wave the receipt around and prove that ID is being used twice,
-    // and that thus one
-    // of the balance changes is entirely invalid, based on a repeated
-    // transaction, but furthermore,
-    // once you have signed a NEW balance agreement (on the receipt of your next
-    // future transaction)
-    // closing transaction #3 for good (and thus removing it from your inbox AND
-    // DESTROYING ANY
-    // TRACE ON THE SERVER SIDE THAT THE TRANSACTION EVER OCCURRED!!!!!) it now
-    // becomes IMPOSSIBLE
-    // for that old instrument to be re-used and to alter your balance! I'll
-    // explain. Remember how
-    // I said, AS LONG AS the receipt appears in your inbox, criminals cannot
-    // steal from you by
-    // putting through a copy of that transaction twice? (since clearly you have
-    // paid already
-    // for transaction #3...) This is easily proven by the simple fact that 2
-    // transactions with
-    // the same ID must appear at the SAME TIME in your inbox for this to be
-    // possible, which would
-    // also appear on every receipt, signed by both client and server, which
-    // clearly both entities
-    // have an interest in consistently refusing to do (neither of them in his
-    // clear mind would ever
-    // sign such a receipt.) Well what happens once the receipt is REMOVED from
-    // your inbox, as you
+    // loaded from storage and signature verified, m_AcctID should also
+    // contain #350. The transaction number is a separate value,
+    // m_lTransactionNum, which uniquely identifies a transaction. The idea
+    // is to prevent a file from loading up into the same variable and
+    // overwriting what we expected with a new value that we didn't expect
+    // (and that perhaps has a good signature on it, but from some other
+    // account, etc). A transaction can ONLY be generated properly (using a
+    // transaction # that was already signed out to you, yadda yadda yadda)
+    // OR it can be an existing transaction being loaded from string or
+    // storage. Since transactions are nested (with a ledger containing a
+    // list of transactions, each containing a list of items) then we always
+    // know WHICH VALUES we are EXPECTING, out of any of these objects,
+    // BEFORE they are loaded into memory. (For account ID, server ID, user
+    // ID.) We set those values when INSTANTIATING the objects, BEFORE they
+    // have been loaded. ===> Then the loading occurs, and we see the server
+    // ID, acct ID, user ID, etc that were ACTUALLY in the file, whose
+    // signature we have now verified, stored as SEPARATE VALUES, so we can
+    // compare. After loading there is a separate, "VERIFY" process, where a
+    // transaction type can be verified, make sure all the right IDs are in
+    // order, etc. Why is this important? Primarily because these IDs *are*
+    // set, for most objects, before they are loaded, and they should NEVER
+    // be different than what they are set to at the time they were FIRST
+    // GENERATED. (Loading should only faithfully copy them, thereafter.)
+    // However, once they are loaded, we shall see what they really are --
+    // and we should not accidentally propagate new and different values
+    // under our own signature, in some future receipt, if they were to be
+    // somehow substituted during the loading phase. Remember that these
+    // objects are nestable. Sometimes an individual transaction item is
+    // later individually tacked onto someone else's receipt. For example,
+    // when someone deposits your cheque, drawn from one of your accounts,
+    // you will not get his entire "depositCheque" transaction attached to
+    // the chequeReceipt in your inbox. That original transaction #3 (say)
+    // not only included a "depositCheque" transaction item, also #3, (and
+    // also for the same acct# and server# etc) but it also included a
+    // "balance agreement" transaction item, necessary for proving his
+    // balance at the time of the transaction, and for proving (between him
+    // and the server) which of his transactions had already cleared, and
+    // which instruments were valid. This is part of the mechanism that
+    // makes destruction of account history possible. Every transaction
+    // request must be accompanied by a signed balance agreement, which has
+    // the same acct # and server # and transaction # as the main
+    // transaction and all the other transaction items. BUT WHAT BUSINSESS
+    // IS IT OF YOURS the information that appears on his balance agreement?
+    // Just because he deposited your cheque, now you should have access to
+    // his entire balance agreement? No, because a copy of his transaction
+    // is not what appears on your chequeReceipt. Rather, the individual
+    // "depositCheque" transaction item is what appears on your receipt, not
+    // any of the other transaction items (such as the balance agreement)
+    // and not a copy of the overall depositCheque transaction itself, that
+    // he originally submitted to the server. Fortunately, each individual
+    // transaction item is signed, and is verified to have all the same IDs
+    // as the overall transaction that it belongs to. And while although
+    // there are individual transaction items for any given transaction#,
+    // there is only a single transaction. And no item can ever be
+    // substituted onto another transaction without failing this
+    // verification, since the IDs wouldn't match--just as none of the IDs
+    // themselves can be changed later without failing the signature
+    // verification. No transaction ID can be used to change your balance,
+    // without a corresponding receipt appearing in your inbox (signed by
+    // you) to compensate for the change in balance. The same instrument
+    // cannot be used to change your balance twice, because two balance
+    // changes (double the amount authorized) must necessarily be
+    // accompanied by two inbox receipts, signed by you, authorizing each
+    // balance change. The same ID cannot appear twice in your inbox without
+    // giving itself away (and provably so, since it appears on every
+    // receipt) and clearly you could wave the receipt around and prove that
+    // ID is being used twice, and that thus one of the balance changes is
+    // entirely invalid, based on a repeated transaction, but furthermore,
+    // once you have signed a NEW balance agreement (on the receipt of your
+    // next future transaction) closing transaction #3 for good (and thus
+    // removing it from your inbox AND DESTROYING ANY TRACE ON THE SERVER
+    // SIDE THAT THE TRANSACTION EVER OCCURRED!!!!!) it now becomes
+    // IMPOSSIBLE for that old instrument to be re-used and to alter your
+    // balance! I'll explain. Remember how I said, AS LONG AS the receipt
+    // appears in your inbox, criminals cannot steal from you by putting
+    // through a copy of that transaction twice? (since clearly you have
+    // paid already for transaction #3...) This is easily proven by the
+    // simple fact that 2 transactions with the same ID must appear at the
+    // SAME TIME in your inbox for this to be possible, which would also
+    // appear on every receipt, signed by both client and server, which
+    // clearly both entities have an interest in consistently refusing to do
+    // (neither of them in his clear mind would ever sign such a receipt.)
+    // Well what happens once the receipt is REMOVED from your inbox, as you
     // sign off on it, in your next/future balance agreement for your next
-    // transaction? Once you
-    // have signed off on the new balance, the server doesn't need to keep a
-    // copy of the inbox
-    // receipt anymore to prove your current balance -- you have now SIGNED OFF
-    // on the latest balance,
-    // so the server doesn't NEED to keep ANYTHING around to prove your balance
-    // anymore, other
-    // than your latest balance agreement. It doesn't NEED your old inbox
-    // receipts anymore to prove
-    // your current balance --- they are old and can be thrown away.  So the
-    // question arises again--
-    // how then can I prevent a SECOND RECEIPT WITH THE SAME ID from appearing
-    // ONCE AGAIN in my Inbox,
-    // (a copy of an old instrument perhaps, featuring my actual signature, that
-    // WAS a valid instrument
-    // in the past, but that has already been used and is no longer valid). How
-    // can I prove that this
-    // instrument, BEARING MY SIGNATURE (along with the account#, server# etc)
-    // is no longer valid?
+    // transaction? Once you have signed off on the new balance, the server
+    // doesn't need to keep a copy of the inbox receipt anymore to prove
+    // your current balance -- you have now SIGNED OFF on the latest
+    // balance, so the server doesn't NEED to keep ANYTHING around to prove
+    // your balance anymore, other than your latest balance agreement. It
+    // doesn't NEED your old inbox receipts anymore to prove your current
+    // balance --- they are old and can be thrown away.  So the question
+    // arises again-- how then can I prevent a SECOND RECEIPT WITH THE SAME
+    // ID from appearing ONCE AGAIN in my Inbox, (a copy of an old
+    // instrument perhaps, featuring my actual signature, that WAS a valid
+    // instrument in the past, but that has already been used and is no
+    // longer valid). How can I prove that this instrument, BEARING MY
+    // SIGNATURE (along with the account#, server# etc) is no longer valid?
     //
     // ====> Because when I closed out the chequeReceipt, signing the new
-    // balance agreement and
-    // removing it from my inbox, that balance agreement included a list of all
-    // the transaction #s
-    // that were STILL SIGNED OUT TO ME AT THAT TIME, and #3 was REMOVED from
-    // that list. That is, I
-    // did not sign the new balance agreement removing the receipt#3 from my
-    // inbox, without simultaneously
-    // forcing the server to sign that I am no longer responsible for
-    // transaction #3.
-    // ===> Therefore, should a receipt ever appear in my inbox in the future,
-    // featuring transaction #3,
-    // it would again be provably invalid, EVEN IF MY SIGNATURE IS GOOD, since I
-    // am no longer responsible
-    // for transaction #3, as I can prove by waving my last (server-signed)
-    // receipt around, which
-    // contains a list of exactly the transaction #s that are still signed out
-    // to me. If the server
-    // wishes to dispute this, then let it produce a newer receipt with my
-    // signature on it. (It cannot.)
+    // balance agreement and removing it from my inbox, that balance
+    // agreement included a list of all the transaction #s that were STILL
+    // SIGNED OUT TO ME AT THAT TIME, and #3 was REMOVED from that list.
+    // That is, I did not sign the new balance agreement removing the
+    // receipt#3 from my inbox, without simultaneously forcing the server to
+    // sign that I am no longer responsible for transaction #3. ===>
+    // Therefore, should a receipt ever appear in my inbox in the future,
+    // featuring transaction #3, it would again be provably invalid, EVEN IF
+    // MY SIGNATURE IS GOOD, since I am no longer responsible for
+    // transaction #3, as I can prove by waving my last (server-signed)
+    // receipt around, which contains a list of exactly the transaction #s
+    // that are still signed out to me. If the server wishes to dispute
+    // this, then let it produce a newer receipt with my signature on it.
+    // (It cannot.)
     //
-    //
-    // Okay, then what if the server tricks me into signing for a transaction #
-    // that I ONCE signed out
-    // BEFORE, years ago? For example, let's say I used #3 for a $10000 cheque,
-    // which was cashed 5 years
+    // Okay, then what if the server tricks me into signing for a
+    // transaction # that I ONCE signed out BEFORE, years ago? For example,
+    // let's say I used #3 for a $10000 cheque, which was cashed 5 years
     // ago. The money already came out of my account. Now it is five years
-    // later, and #3 no longer appears
-    // on my list, but as a normal routine of banking, I ask the server for some
-    // new transaction #s, and
-    // it sends me #3, and I sign out the number AGAIN. Perhaps I am about to
-    // use it for buying a stick of
-    // gum for 5 cents. But the malicious server pounces! It was waiting for
-    // this, and it immediately runs
-    // through the $100000 cheque from 5 years before! Featuring the exact same
-    // transaction #, and
-    // featuring my signature!  But it cannot do this either, because no user
-    // will ever sign out a transaction
-    // number that is LESS THAN one it has signed out in the past! The Nym
-    // object keeps track of the highest
+    // later, and #3 no longer appears on my list, but as a normal routine
+    // of banking, I ask the server for some new transaction #s, and it
+    // sends me #3, and I sign out the number AGAIN. Perhaps I am about to
+    // use it for buying a stick of gum for 5 cents. But the malicious
+    // server pounces! It was waiting for this, and it immediately runs
+    // through the $100000 cheque from 5 years before! Featuring the exact
+    // same transaction #, and featuring my signature!  But it cannot do
+    // this either, because no user will ever sign out a transaction number
+    // that is LESS THAN one it has signed out in the past! The Nym object
+    // keeps track of the highest
     // # it has EVER received from each server, and it will NEVER sign out a
-    // transaction # that is less
-    // than this number.
+    // transaction # that is less than this number.
     //
     // Remember, the transaction # of all of these NESTED, TRANSACTION TYPE
-    // objects, (ledgers, transactions,
-    // transaction items, balance agreements, etc) must match perfectly, and is
-    // verified at the same time
-    // that the signature on the transaction is verified. The same is true for
-    // verifying the account ID,
-    // the server ID, and the user ID. Any discrepancy is immediately caught
-    // anytime a transaction is
+    // objects, (ledgers, transactions, transaction items, balance
+    // agreements, etc) must match perfectly, and is verified at the same
+    // time that the signature on the transaction is verified. The same is
+    // true for verifying the account ID, the server ID, and the user ID.
+    // Any discrepancy is immediately caught anytime a transaction is
     // loaded/verified (which must happen in order for it to be used.) A
-    // malicious actor wishing to trick
-    // you into signing a transaction # you were not expecting (so as to make
-    // you liable for some old
-    // instrument you signed, bearing the same #) cannot do so if you will only
-    // write the "Real" server
-    // ID when first generating the transaction (such as when first generating
-    // the transaction), but you
-    // will only read or write into the "Purported" server ID when loading
-    // something up, and that you always
-    // compare them when loading. Instantly any discrepancy is caught upon
-    // loading, preventing the transaction
-    // from loading, and thus preventing you from later going on to sign the
-    // wrong number after loading it,
-    // by for example including a copy of it on some signed receipt of your own.
-    // You could not have included
-    // it on your signed receipt, without loading it up first, and you could not
-    // have loaded it without
-    // verifying the signatures and IDs on all sub-items. You never could have
-    // had an actual ID overwritten
-    // by the wrong ID, and then perpetuated by your own signed copies of that
-    // going into the future.
+    // malicious actor wishing to trick you into signing a transaction # you
+    // were not expecting (so as to make you liable for some old instrument
+    // you signed, bearing the same #) cannot do so if you will only write
+    // the "Real" server ID when first generating the transaction (such as
+    // when first generating the transaction), but you will only read or
+    // write into the "Purported" server ID when loading something up, and
+    // that you always compare them when loading. Instantly any discrepancy
+    // is caught upon loading, preventing the transaction from loading, and
+    // thus preventing you from later going on to sign the wrong number
+    // after loading it, by for example including a copy of it on some
+    // signed receipt of your own. You could not have included it on your
+    // signed receipt, without loading it up first, and you could not have
+    // loaded it without verifying the signatures and IDs on all sub-items.
+    // You never could have had an actual ID overwritten by the wrong ID,
+    // and then perpetuated by your own signed copies of that going into the
+    // future.
     //
-    // The IDs that appear on the transaction when it is FIRST GENERATED -- one
-    // ID is even signed out to me --
-    // are the only IDs that can ever appear. Example: Alice owns accounts A and
-    // B. Therefore the server
-    // will successfully verify Alice's signature on any account A instruments,
-    // and it will also successfully
-    // verify Alice's signature on any account B instruments.  This means if you
-    // sneakily give the server
-    // an "account B" instrument, BUT TRY TO REDEEM IT AT "ACCOUNT A", that the
-    // signature itself, on the
-    // signed instrument, WILL VERIFY SUCCESSFULLY. When the server is loading a
-    // transaction for "account A",
-    // it is coming from an "account A" ledger, which already has the acct#
-    // built it, and thus it sets that
-    // account # onto the transaction before the transaction is even loaded.
-    // Once the transaction is loaded,
-    // the # inside is available (we now have both) and we can compare them to
-    // make sure they are the same,
-    // which we do before ever actually using that transaction object. This is
-    // why it's important not to
-    // simply "load up" the transaction and go with whatever IDs are in there,
-    // or allow them to overwrite
-    // the ones we are expecting to be there.
+    // The IDs that appear on the transaction when it is FIRST GENERATED --
+    // one ID is even signed out to me -- are the only IDs that can ever
+    // appear. Example: Alice owns accounts A and B. Therefore the server
+    // will successfully verify Alice's signature on any account A
+    // instruments, and it will also successfully verify Alice's signature
+    // on any account B instruments.  This means if you sneakily give the
+    // server an "account B" instrument, BUT TRY TO REDEEM IT AT "ACCOUNT
+    // A", that the signature itself, on the signed instrument, WILL VERIFY
+    // SUCCESSFULLY. When the server is loading a transaction for "account
+    // A", it is coming from an "account A" ledger, which already has the
+    // acct# built it, and thus it sets that account # onto the transaction
+    // before the transaction is even loaded. Once the transaction is
+    // loaded, the # inside is available (we now have both) and we can
+    // compare them to make sure they are the same, which we do before ever
+    // actually using that transaction object. This is why it's important
+    // not to simply "load up" the transaction and go with whatever IDs are
+    // in there, or allow them to overwrite the ones we are expecting to be
+    // there.
     //
+    // Basically: We set the number beforehand, and verify after loading to
+    // make sure each thing loaded has the IDs expected. The # cannot be
+    // changed after signing, without invalidating the signature, so we
+    // verify the signature. This means the transaction item cannot be used
+    // on any OTHER transaction except for the one it was meant, or by any
+    // other acct owned by that same nym, because those IDs are compared
+    // whenever each piece is loaded. An "account B" instrument, with
+    // "account B" written all it, cannot be simply loaded as an "account A"
+    // transaction, even though the signature is good, because the "account
+    // B" will be loaded into a separate spot than the actual acct #, and
+    // compared against it. I will never accidentally sign "account B"
+    // transaction thinking that it is an "account A" transaction.
+    // Furthermore, I will never load an "account B" transaction and then
+    // accidentally overwrite "A" over the "B" and sign it again. (Meaning I
+    // cannot be tricked, by a valid signature on "B", into loading it up
+    // mistakenly as an "A" and then signing it as an "A" when it was
+    // secretly a "B" the whole time.)
     //
-    // Basically: We set the number beforehand, and verify after loading to make
-    // sure each thing loaded has the
-    // IDs expected. The # cannot be changed after signing, without invalidating
-    // the signature, so we verify the
-    // signature. This means the transaction item cannot be used on any OTHER
-    // transaction except for the one
-    // it was meant, or by any other acct owned by that same nym, because those
-    // IDs are compared whenever each
-    // piece is loaded.
-    // An "account B" instrument, with "account B" written all it, cannot be
-    // simply loaded as an "account A"
-    // transaction, even though the signature is good, because the "account B"
-    // will be loaded into a separate
-    // spot than the actual acct #, and compared against it. I will never
-    // accidentally sign "account B" transaction
-    // thinking that it is an "account A" transaction. Furthermore, I will never
-    // load an "account B" transaction
-    // and then accidentally overwrite "A" over the "B" and sign it again.
-    // (Meaning I cannot be tricked, by
-    // a valid signature on "B", into loading it up mistakenly as an "A" and
-    // then signing it as an "A" when it
-    // was secretly a "B" the whole time.)
-    //
-    // The idea is that whatever number appears inside a transaction (and all
-    // its items) when you LOAD the file
-    // will always be the same number that you write out when you SAVE the file.
-    // But that this number might
-    // not be the same as the number that it was when you first generated the
-    // transaction, or that you are
-    // expecting it to be when you load the transaction up. You keep them
-    // separate, and you compare them to
-    // make sure they are the same.
-    // Put another way: You don't want to load up a bad number and then
-    // accidentally save a bad transaction with
-    // a GOOD ID, simply because you were EXPECTING it to be the right number
-    // (and had thus forced that # as the only
-    // one you're willing to write), and you also don't want to FAIL TO EXPECT A
-    // SPECIFIC NUMBER and thus allow
-    // it to be determined by what is loaded up, in complete disregard of what
-    // number was expected to be there before
+    // The idea is that whatever number appears inside a transaction (and
+    // all its items) when you LOAD the file will always be the same number
+    // that you write out when you SAVE the file. But that this number might
+    // not be the same as the number that it was when you first generated
+    // the transaction, or that you are expecting it to be when you load the
+    // transaction up. You keep them separate, and you compare them to make
+    // sure they are the same. Put another way: You don't want to load up a
+    // bad number and then accidentally save a bad transaction with a GOOD
+    // ID, simply because you were EXPECTING it to be the right number (and
+    // had thus forced that # as the only one you're willing to write), and
+    // you also don't want to FAIL TO EXPECT A SPECIFIC NUMBER and thus
+    // allow it to be determined by what is loaded up, in complete disregard
+    // of what number was expected to be there before
     //
     // Put another way:
     // 1. You normally want to force specific IDs when you sign a contract, to

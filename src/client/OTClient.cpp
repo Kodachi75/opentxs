@@ -1403,7 +1403,7 @@ void OTClient::ProcessIncomingTransactions(OTServerConnection& theConnection,
                                                 // At this point, we've removed the outpayment already, and it will be
                                                 // deleted when it goes out of scope already. And we've got a copy of
                                                 // the original financial instrument that was SENT in that outpayment.
-                                                // //
+                                                //
                                                 // But what for? Why did I want that instrument here in a string, in
                                                 // strInstrument? Do I still need to do something with it? Yes: I need
                                                 // to drop a copy of it into the record box!
@@ -1625,8 +1625,27 @@ void OTClient::ProcessIncomingTransactions(OTServerConnection& theConnection,
 
                                                 if (nullptr != pNewTransaction) // The above has an OT_ASSERT within, but I just like to check my pointers.
                                                 {
+                                                    // Whether the reply item we received was acknowledged or rejected, we create a
+                                                    // corresponding Item::notice for our new record, to save that state for the client.
+                                                    // Our record box will contain the server's most recent version of the payment plan,
+                                                    // (The one I just activated -- since I was the final signer...)
+                                                    //
+                                                    Item * pNewItem = Item::CreateItemFromTransaction(*pNewTransaction, Item::notice);
+                                                    OT_ASSERT(nullptr != pNewItem); // This may be unnecessary, I'll have to check CreateItemFromTransaction.
+                                                                                    // I'll leave it for now.
+                                                    pNewItem->SetStatus(pReplyItem->GetStatus());
+                                                    pNewItem->SetNote(strCronItem); // Since I am the last signer, the note contains the final version of the agreement.
+                                                    pNewItem->SignContract(*pNym);
+                                                    pNewItem->SaveContract();
+                                                    
+                                                    pNewTransaction->AddItem(*pNewItem); // Takes ownership.
+                                                    // -----------------------------------------------------
                                                     pNewTransaction->SetReferenceToNum(lNymOpeningNumber); // Referencing myself here. We'll see how it works out.
                                                     pNewTransaction->SetReferenceString(strInstrument); // The cheque, invoice, etc that used to be in the outpayments box.
+                                                    
+                                                    if (pTransaction->IsCancelled())
+                                                        pNewTransaction->SetAsCancelled();
+                                                    
                                                     pNewTransaction->SignContract(*pNym);
                                                     pNewTransaction->SaveContract();
                                                     
@@ -3983,9 +4002,9 @@ bool OTClient::processServerReplyProcessInbox(const Message& theReply,
                                     {                                   // (Probably contains an updated version, with Bob's signature added.)
                                         Identifier theCancelerNymID;
                                         const int64_t lNymOpeningNumber = pOriginalCronItem->GetOpeningNumber(pNym->GetConstID());
-                                        const bool bCancelling      = (pCronItem->IsCanceled() && pCronItem->GetCancelerID(theCancelerNymID));
-                                        const bool bIsCancelerNym   = (bCancelling && (pNym->GetConstID() == theCancelerNymID));
-                                        const bool bIsActivatingNym = (pCronItem->GetOpeningNum() == lNymOpeningNumber);
+                                        const bool    bCancelling       = (pCronItem->IsCanceled() && pCronItem->GetCancelerID(theCancelerNymID));
+                                        const bool    bIsCancelerNym    = (bCancelling && (pNym->GetConstID() == theCancelerNymID));
+                                        const bool    bIsActivatingNym  = (pCronItem->GetOpeningNum() == lNymOpeningNumber);
                                         
                                         // If the opening number for the cron item is the SAME as Nym's opening
                                         // number, then Nym is the ACTIVATING NYM (Skip him, since he does this
@@ -4186,7 +4205,22 @@ bool OTClient::processServerReplyProcessInbox(const Message& theReply,
                                                     {
                                                         theOutpayment.GetAllTransactionNumbers(numlistOutpayment);
                                                     }
+                                                    // -------------------------------------------------
+//                                                  if (0 == numlistOutpayment.Count())
+                                                    {
+                                                        OTPayment tempPayment;
+                                                        const String & strCronItem = (strUpdatedCronItem.Exists() ? strUpdatedCronItem : strOriginalCronItem);
+                                                        
+                                                        if (strCronItem.Exists() &&
+                                                            tempPayment.SetPayment(strCronItem) &&
+                                                            tempPayment.SetTempValues())
+                                                        {
+                                                            // ---------------------
+                                                            tempPayment.GetAllTransactionNumbers(numlistOutpayment);
+                                                        }
 
+                                                    }
+                                                    // -------------------------------------------------
                                                     const int32_t nTransCount = thePmntInbox.GetTransactionCount();
 
                                                     for (int32_t ii = (nTransCount - 1); ii >= 0; --ii) // Count backwards since we are removing things.
@@ -4226,9 +4260,6 @@ bool OTClient::processServerReplyProcessInbox(const Message& theReply,
                                                             OT_ASSERT(nullptr != pTransPaymentInbox); // It DEFINITELY should be there. (Assert otherwise.)
                                                             int64_t lPaymentTransNum = pTransPaymentInbox->GetTransactionNum();
 
-                                                            // DON'T I NEED to call DeleteBoxReceipt at this point? Since that needs
-                                                            // to be called now whenever removing something from any box?
-                                                            //
                                                             // NOTE: might need to just MOVE this box receipt to the record box,
                                                             // instead of deleting it.
                                                             //
@@ -4287,15 +4318,36 @@ bool OTClient::processServerReplyProcessInbox(const Message& theReply,
                                                             // wouldn't send me the SAME instrument TWICE, would you? But it still
                                                             // seems theoretically possible (albeit stupid.)
                                                         }
+//                                                      else
+//                                                      {
+//                                                          otErr << "\n\n ----------- OTCLIENT: Did NOT find matching 'pending incoming' with overlapping numbers.\n";
+//
+//                                                          String strNumlistIn, strNumlistOut;
+//                                                            
+//                                                          numlistIncomingPayment.Output(strNumlistIn);
+//                                                          numlistOutpayment.Output(strNumlistOut);
+//                                                            
+//                                                          otErr << "  strNumlistIn: "  << strNumlistIn  << "\n";
+//                                                          otErr << "  strNumlistOut: " << strNumlistOut << "\n\n";
+//                                                      }
                                                     } // for (int32_t ii = 0; ii < nTransCount; ++ii)
                                                     // ----------------------------------------------------------------------
                                                     // Also, if there was a message in the outpayments box (which we already
                                                     // removed a bit above), go ahead and add a receipt for it into the
                                                     // record box.
                                                     //
-                                                    if (strSentInstrument.Exists()) // Found the instrument in the outpayments box.
+                                                    // UPDATE: Imagine that Alice sends a payment plan to Bob. Then she CANCELS it.
+                                                    // Notice that Bob has never even signed it, never forwarded it, never activated it,
+                                                    // NOTHING. It was just sitting as "pending incoming" in his box when she canceled it.
+                                                    // Therefore, we could NOT expect to find the thing in Bob's outpayments box, ever!
+                                                    // (In that scenario.)
+                                                    // But we'd still want Bob to get the notice, right? Since he still has that "pending incoming"
+                                                    // that should instead now say "CANCELED" -- right?
+                                                    // Therefore we have to place the below notice REGARDLESS of whether or not it was found in
+                                                    // Bob's outpayments box! (Thus I've commented out the 'if' here.)
+                                                    //
+//                                                  if (strSentInstrument.Exists()) // Found the instrument in the outpayments box.
                                                     {
-                                                        
                                                         // Fixing a bug here. Currently, for pNewTransaction, we're setting the reference
                                                         // string to the version of the instrument from the outpayments box. (strSentInstrument).
                                                         // However, if Alice sends a payment plan request to Bob, then the version in her
@@ -4325,7 +4377,7 @@ bool OTClient::processServerReplyProcessInbox(const Message& theReply,
                                                         OTTransaction * pNewTransaction = OTTransaction::GenerateTransaction(
                                                                     theRecordBox, // recordbox.
                                                                     OTTransaction::notice,
-                                                                    lNymOpeningNumber);
+                                                                    pServerTransaction->GetTransactionNum());
                                                         std::unique_ptr<OTTransaction> theTransactionAngel(pNewTransaction);
 
                                                         if (nullptr != pNewTransaction) // The above has an OT_ASSERT within, but I just like to check my pointers.
@@ -4350,8 +4402,33 @@ bool OTClient::processServerReplyProcessInbox(const Message& theReply,
                                                                 pNewTransaction->AddItem(*pNewItem); // Takes ownership.
                                                             }
                                                             
-                                                            pNewTransaction->SetReferenceToNum(lNymOpeningNumber); // Referencing myself here. We'll see how it works out.
-                                                            pNewTransaction->SetReferenceString(strSentInstrument); // The cheque, invoice, etc that was in the outpayments box.
+                                                            int64_t lTransNumForDisplay = 0;
+                                                            
+                                                            if (!theOutpayment.IsValid() || !theOutpayment.GetTransNumDisplay(lTransNumForDisplay))
+//                                                                lTransNumForDisplay = pServerTransaction->GetReferenceNumForDisplay();
+//                                                            
+//                                                            if (0 == lTransNumForDisplay)
+                                                            {
+                                                                OTPayment tempPayment;
+                                                                const String & strCronItem = (strUpdatedCronItem.Exists() ? strUpdatedCronItem : strOriginalCronItem);
+                                                                
+                                                                if (strCronItem.Exists() &&
+                                                                    tempPayment.SetPayment(strCronItem) &&
+                                                                    tempPayment.SetTempValues())
+                                                                    // ---------------------
+                                                                    tempPayment.GetTransNumDisplay(lTransNumForDisplay);
+                                                            }
+                                                            
+                                                            pNewTransaction->SetReferenceToNum(lTransNumForDisplay);
+                                                            
+                                                            if (strSentInstrument.Exists())
+                                                                pNewTransaction->SetReferenceString(strSentInstrument); // The cheque, invoice, etc that was in the outpayments box.
+                                                            else if (strOriginalCronItem.Exists())
+                                                                pNewTransaction->SetReferenceString(strOriginalCronItem); // The original cheque, invoice, etc according to the server.
+                                                            
+                                                            if (bCancelling)
+                                                                pNewTransaction->SetAsCancelled();
+                                                            
                                                             pNewTransaction->SignContract(*pNym);
                                                             pNewTransaction->SaveContract();
                                                             

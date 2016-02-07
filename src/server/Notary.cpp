@@ -5211,9 +5211,8 @@ void Notary::NotarizeSmartContract(Nym& theNym, Account& theActivatingAccount,
                         pContract->SendNoticeToAllParties(
                             false, server_->m_nymServer, NOTARY_ID,
                             lNewTransactionNumber,
-                            // // Each party has its own opening number. Handled
-                            // internally.
-                            strContract, nullptr, nullptr, &theNym)) {
+                            // // Each party has its own opening number. Handled internally.
+                            strContract, &strContract, nullptr, &theNym)) {
                         // NOTE: A party may deliberately try to activate a
                         // smart contract without signing it.
                         // (As a way of rejecting it.) This will cause rejection
@@ -5225,8 +5224,7 @@ void Notary::NotarizeSmartContract(Nym& theNym, Account& theActivatingAccount,
                         // "activates" the contract, then this piece of code
                         // here will DEFINITELY fail to send
                         // the rejection notice to the last 2 parties (since
-                        // they hadn't even signed the contract
-                        // yet.)
+                        // they hadn't even signed the contract yet.)
                         //
                         // (Since we expect that to normally happen, we don't
                         // log an error here.)
@@ -5253,7 +5251,7 @@ void Notary::NotarizeSmartContract(Nym& theNym, Account& theActivatingAccount,
                             lNewTransactionNumber,
                             // // Each party has its own opening number. Handled
                             // internally.
-                            strContract, nullptr, nullptr, &theNym)) {
+                            strContract, &strContract, nullptr, &theNym)) {
                         Log::vOutput(
                             0, "%s: Failed notifying parties while trying to "
                                "activate smart contract: %" PRId64 ".\n",
