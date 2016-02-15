@@ -5794,7 +5794,6 @@ int64_t OTTransaction::GetReferenceNumForDisplay()
     case OTTransaction::replyNotice:
     case OTTransaction::successNotice:
     case OTTransaction::marketReceipt:
-    case OTTransaction::paymentReceipt:
     case OTTransaction::basketReceipt:
     case OTTransaction::instrumentNotice:
             /*
@@ -5822,6 +5821,7 @@ int64_t OTTransaction::GetReferenceNumForDisplay()
         break;
 
             
+    case OTTransaction::paymentReceipt:
     case OTTransaction::finalReceipt: {
         lReferenceNum = GetReferenceToNum();
 

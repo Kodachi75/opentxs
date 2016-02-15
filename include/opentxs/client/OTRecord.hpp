@@ -102,6 +102,8 @@ private:
     //
     int64_t m_lTransactionNum;
     int64_t m_lTransNumForDisplay;
+    int64_t m_lClosingNum = 0;  // Only used for finalReceipts.
+    
     bool m_bIsPending;
     bool m_bIsOutgoing;
     bool m_bIsRecord;  // record box (closed, finished, historical only.)
@@ -115,6 +117,7 @@ private:
     bool m_bIsNotice;
     bool m_bIsExpired;
     bool m_bIsCanceled;
+    bool m_bIsFinalReceipt = false;
     OTRecordType m_RecordType;
     
     bool m_bHasSuccess = false; // Does it even HAVE a "success" state?
@@ -128,12 +131,16 @@ public:
     EXPORT void SetSuccess(const bool bIsSuccess);
     EXPORT bool HasSuccess(bool & bIsSuccess) const;
     
+    EXPORT void SetClosingNum(const int64_t lClosingNum);
+    EXPORT bool GetClosingNum(int64_t & lClosingNum) const;
+    
     EXPORT void SetSpecialMail(bool bIsSpecial = true);
     EXPORT bool IsSpecialMail() const;
     EXPORT bool IsPending() const;
     EXPORT bool IsOutgoing() const;
     EXPORT bool IsRecord() const;
     EXPORT bool IsReceipt() const;
+    EXPORT bool IsFinalReceipt() const;
     EXPORT bool IsMail() const;
     EXPORT bool IsTransfer() const;
     EXPORT bool IsCheque() const;
@@ -149,6 +156,7 @@ public:
     EXPORT bool IsCanceled() const;
     EXPORT void SetExpired();
     EXPORT void SetCanceled();
+    EXPORT void SetFinalReceipt(bool bValue=true);
     EXPORT time64_t GetValidFrom() const;
     EXPORT time64_t GetValidTo() const;
     EXPORT void SetDateRange(time64_t tValidFrom,

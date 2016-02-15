@@ -115,10 +115,8 @@ public:
     // From parent:  (This must be called first, before the other two methods
     // below can be called.)
     //
-    //    bool        SetAgreement(const int64_t& lTransactionNum,    const
-    // OTString& strConsideration,
-    //                             const time64_t& VALID_FROM=0,    const
-    // time64_t& VALID_TO=0);
+//  bool        SetAgreement(const int64_t& lTransactionNum, const OTString& strConsideration,
+//                           const time64_t& VALID_FROM=0,   const time64_t& VALID_TO=0);
 
     // Then call one (or both) of these:
 
@@ -126,39 +124,36 @@ public:
         const int64_t& lAmount,
         time64_t tTimeUntilInitialPayment = OT_TIME_ZERO); // default: now.
 
-    // These two can be called independent of each other. You can
-    // have an initial payment, AND/OR a payment plan.
+    // These two methods (above and below) can be called independent of each other.
+    //
+    // Meaning: You can have an initial payment AND/OR a payment plan.
 
     EXPORT bool SetPaymentPlan(
         const int64_t& lPaymentAmount,
         time64_t tTimeUntilPlanStart = OT_TIME_MONTH_IN_SECONDS,
-        time64_t tBetweenPayments = OT_TIME_MONTH_IN_SECONDS, // Default: 30
-                                                              // days.
+        time64_t tBetweenPayments = OT_TIME_MONTH_IN_SECONDS, // Default: 30 days.
         time64_t tPlanLength = OT_TIME_ZERO, int32_t nMaxPayments = 0);
 
     // VerifyAgreement()
-    // This function verifies both Nyms and both signatures.
-    // Due to the peculiar nature of how OTAgreement/OTPaymentPlan works, there
-    // are two signed
-    // copies stored. The merchant signs first, adding his transaction numbers
-    // (2), and then he
-    // sends it to the customer, who also adds two numbers and signs. (Also
-    // resetting the creation date.)
-    // The problem is, adding the additional transaction numbers invalidates the
-    // first (merchant's)
-    // signature.
-    // The solution is, when the customer confirms the agreement, he stores an
-    // internal copy of the
-    // merchant's signed version.  This way later, in VERIFY AGREEMENT, the
-    // internal copy can be loaded,
-    // and BOTH Nyms can be checked to verify that BOTH transaction numbers are
-    // valid for each.
-    // The two versions of the contract can also be compared to each other, to
-    // make sure that none of
-    // the vital terms, values, clauses, etc are different between the two.
+    // This function verifies both Nyms and both signatures. Due to the
+    // peculiar nature of how OTAgreement/OTPaymentPlan works, there are two
+    // signed copies stored. The merchant signs first, adding his
+    // transaction numbers (2), and then he sends it to the customer, who
+    // also adds two numbers and signs. (Also resetting the creation date.)
+    // The problem is, adding the additional transaction numbers invalidates
+    // the first (merchant's) signature. The solution is, when the customer
+    // confirms the agreement, he stores an internal copy of the merchant's
+    // signed version.  This way later, in VERIFY AGREEMENT, the internal
+    // copy can be loaded, and BOTH Nyms can be checked to verify that BOTH
+    // transaction numbers are valid for each. The two versions of the
+    // contract can also be compared to each other, to make sure that none
+    // of the vital terms, values, clauses, etc are different between the two.
     //
     virtual bool VerifyAgreement(Nym& RECIPIENT_NYM, Nym& SENDER_NYM) const;
     virtual bool CompareAgreement(const OTAgreement& rh) const;
+    
+    bool VerifyMerchantSignature(Nym& RECIPIENT_NYM) const;
+    bool VerifyCustomerSignature(Nym& SENDER_NYM   ) const;
 
     // ************ "INITIAL PAYMENT" public GET METHODS **************
 public:
@@ -195,16 +190,12 @@ public:
     // "INITIAL PAYMENT" private MEMBERS
 private:
     bool m_bInitialPayment;         // Will there be an initial payment?
-    time64_t m_tInitialPaymentDate; // Date of the initial payment, measured
-                                    // seconds after creation.
-    time64_t m_tInitialPaymentCompletedDate; // Date the initial payment was
-                                             // finally transacted.
-    time64_t m_tFailedInitialPaymentDate;    // Date of the last failed payment,
-                                             // measured seconds after creation.
+    time64_t m_tInitialPaymentDate; // Date of the initial payment, measured seconds after creation.
+    time64_t m_tInitialPaymentCompletedDate; // Date the initial payment was finally transacted.
+    time64_t m_tFailedInitialPaymentDate;    // Date of the last failed payment, measured seconds after creation.
     int64_t m_lInitialPaymentAmount;         // Amount of the initial payment.
     bool m_bInitialPaymentDone;       // Has the initial payment been made?
-    int32_t m_nNumberInitialFailures; // If we've tried to process this multiple
-                                      // times, we'll know.
+    int32_t m_nNumberInitialFailures; // If we've tried to process this multiple times, we'll know.
 
     // "INITIAL PAYMENT" protected SET METHODS
 protected:
@@ -291,20 +282,14 @@ private:
     bool m_bPaymentPlan;              // Will there be a payment plan?
     int64_t m_lPaymentPlanAmount;     // Amount of each payment.
     time64_t m_tTimeBetweenPayments;  // How much time between each payment?
-    time64_t m_tPaymentPlanStartDate; // Date for the first payment plan
-                                      // payment.
-    time64_t m_tPaymentPlanLength; // Optional. Plan length measured in seconds
-                                   // since plan start.
-    int32_t m_nMaximumNoPayments;  // Optional. The most number of payments that
-                                   // are authorized.
+    time64_t m_tPaymentPlanStartDate; // Date for the first payment plan payment.
+    time64_t m_tPaymentPlanLength; // Optional. Plan length measured in seconds since plan start.
+    int32_t m_nMaximumNoPayments;  // Optional. The most number of payments that are authorized.
 
     time64_t m_tDateOfLastPayment; // Recording of date of the last payment.
-    time64_t m_tDateOfLastFailedPayment; // Recording of date of the last failed
-                                         // payment.
-    int32_t m_nNoPaymentsDone;   // Recording of the number of payments already
-                                 // processed.
-    int32_t m_nNoFailedPayments; // Every time a payment fails, we record that
-                                 // here.
+    time64_t m_tDateOfLastFailedPayment; // Recording of date of the last failed payment.
+    int32_t m_nNoPaymentsDone;   // Recording of the number of payments already processed.
+    int32_t m_nNoFailedPayments; // Every time a payment fails, we record that here.
 
     // "PAYMENT PLAN" protected SET METHODS
 protected:
@@ -362,86 +347,13 @@ private: // These are NOT stored as part of the payment plan. They are merely
     bool m_bProcessingPaymentPlan;
 
 public:
-    // From OTAgreement (parent class of this)
-    /*
-     inline OTIdentifier&    GetRecipientAcctID()        { return
-     m_RECIPIENT_ACCT_ID; }
-     inline OTIdentifier&    GetRecipientNymID()        { return
-     m_RECIPIENT_NYM_ID; }
-     inline void            SetRecipientAcctID(OTIdentifier& ACCT_ID)    {
-     m_RECIPIENT_ACCT_ID = ACCT_ID; }
-     inline void            SetRecipientNymID(OTIdentifier& NYM_ID)    {
-     m_RECIPIENT_NYM_ID = NYM_ID; }
-
-     const OTString&  GetConsideration() const { return m_strConsideration; }
-     */
     // Return True if should stay on OTCron's list for more processing.
     // Return False if expired or otherwise should be removed.
     virtual bool ProcessCron(); // OTCron calls this regularly, which is my
                                 // chance to expire, etc.
-
-    // From OTCronItem (parent class of OTAgreement, parent class of this)
-
-    /*
-     inline void SetCronPointer(OTCron& theCron) { m_pCron = &theCron; }
-
-     inline void SetCreationDate(const time64_t& CREATION_DATE) {
-     m_CREATION_DATE = CREATION_DATE; }
-     inline const time64_t& GetCreationDate() const { return m_CREATION_DATE; }
-     */
-
-    // From OTTrackable (parent class of OTCronItem, parent class of
-    // OTAgreement, parent of this)
-    /*
-     inline int64_t GetTransactionNum() const { return m_lTransactionNum; }
-     inline void SetTransactionNum(int64_t lTransactionNum) { m_lTransactionNum
-     = lTransactionNum; }
-
-     inline const   OTIdentifier&    GetSenderAcctID()               { return
-     m_SENDER_ACCT_ID; }
-     inline const   OTIdentifier&    GetSenderNymID()               { return
-     m_SENDER_NYM_ID; }
-     inline void    SetSenderAcctID(const OTIdentifier& ACCT_ID)    {
-     m_SENDER_ACCT_ID = ACCT_ID; }
-     inline void    SetSenderNymID(const OTIdentifier& NYM_ID)    {
-     m_SENDER_NYM_ID = NYM_ID; }
-     */
-
-    // From OTInstrument (parent of OTTrackable, parent of OTCronItem, parent of
-    // OTAgreement, parent of this)
-    /*
-     OTInstrument(const OTIdentifier& NOTARY_ID, const OTIdentifier&
-     INSTRUMENT_DEFINITION_ID)
-     : Contract()
-
-     inline const OTIdentifier& GetInstrumentDefinitionID() const { return
-     m_InstrumentDefinitionID; }
-     inline const OTIdentifier& GetNotaryID() const { return m_NotaryID; }
-
-     inline void SetInstrumentDefinitionID(const OTIdentifier&
-     INSTRUMENT_DEFINITION_ID)  {
-     m_InstrumentDefinitionID    =
-     INSTRUMENT_DEFINITION_ID; }
-     inline void SetNotaryID(const OTIdentifier& NOTARY_ID) { m_NotaryID    =
-     NOTARY_ID; }
-
-     inline time64_t GetValidFrom()    const { return m_VALID_FROM; }
-     inline time64_t GetValidTo()        const { return m_VALID_TO; }
-
-     inline void SetValidFrom(time64_t TIME_FROM)    { m_VALID_FROM    =
-     TIME_FROM; }
-     inline void SetValidTo(time64_t TIME_TO)        { m_VALID_TO    = TIME_TO;
-     }
-
-     bool VerifyCurrentDate(); // Verify the current date against the VALID FROM
-     / TO dates.
-     bool IsExpired()
-     */
 protected:
-    //  virtual void onFinalReceipt();        // Now handled in the parent
-    // class.
-    //  virtual void onRemovalFromCron();     // Now handled in the parent
-    // class.
+//  virtual void onFinalReceipt();        // Now handled in the parent class.
+//  virtual void onRemovalFromCron();     // Now handled in the parent class.
 
     bool ProcessPayment(const int64_t& lAmount);
     void ProcessInitialPayment();

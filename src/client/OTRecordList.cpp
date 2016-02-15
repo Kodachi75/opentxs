@@ -821,7 +821,7 @@ bool OTRecordList::PerformAutoAccept()
                                     //
                                     if (display_number <= 0)
                                         display_number = lPaymentBoxTransNum;
-                                    
+                                    // ------------------------------------------------------
                                     m_pLookup->notifyOfSuccessfulNotarization(str_account_id,
                                                                           strAcctNymID.Get(),
                                                                           strAcctNotaryID.Get(),
@@ -3264,16 +3264,20 @@ bool OTRecordList::Populate()
                       << ": Account RECORD index: " << nRecordIndex << "\n";
                 bool bOutgoing = false;
                 bool bCanceled = false;
-                std::string str_name; // name of sender OR recipient (depending
-                                      // on whether it was originally incoming
-                                      // or outgoing.)
+                std::string str_name; // name of sender OR recipient (depending on whether
+                                      // it was originally incoming or outgoing.)
                 std::string str_other_nym_id;
                 std::string str_other_acct_id;
                 std::string str_memo;
                 
                 bool bHasSuccess = false;
                 bool bIsSuccess  = false;
-
+                
+                int64_t lClosingNum = 0;
+                const bool bIsFinalReceipt = (OTTransaction::finalReceipt == pBoxTrans->GetType());
+                if (bIsFinalReceipt)
+                    lClosingNum = pBoxTrans->GetClosingNum();
+                
                 if (!pBoxTrans->IsAbbreviated())
                 {
                     if (pBoxTrans->GetType() != OTTransaction::pending)
@@ -3294,10 +3298,8 @@ bool OTRecordList::Populate()
                         //
                         if (0 ==
                             str_account_id.compare(
-                                str_sender_acct_id)) // str_account_id IS
-                                                     // str_sender_acct_id.
-                                                     // (Therefore we want
-                                                     // recipient.)
+                                str_sender_acct_id)) // str_account_id IS str_sender_acct_id.
+                                                     // (Therefore we want recipient.)
                         {
                             bOutgoing = true; // if Nym is the sender, then it
                                               // must have been outgoing.
@@ -3429,10 +3431,7 @@ bool OTRecordList::Populate()
                                 str_recipient_acct_id,
                                 str_other_nym_id, // nym ID if known
                                 *pstr_notary_id,  // server ID if known.
-                                *pstr_instrument_definition_id)), // instrument
-                                                                  // definition
-                                                                  // id if
-                                                                  // known.
+                                *pstr_instrument_definition_id)), // instrument definition id if known.
                                 strNameTemp;
 
                             if (strName.Exists())
@@ -3641,6 +3640,12 @@ bool OTRecordList::Populate()
                 
                 if (bHasSuccess)
                     sp_Record->SetSuccess(bIsSuccess);
+                
+                if (bIsFinalReceipt)
+                {
+                    sp_Record->SetFinalReceipt();
+                    sp_Record->SetClosingNum(lClosingNum);
+                }
                 
 //                otErr << "DEBUGGING! Added " << (bOutgoing ? "sent": "received") << " asset account record: " <<
 //                pBoxTrans->GetTypeString() <<

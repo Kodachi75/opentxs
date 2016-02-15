@@ -505,6 +505,34 @@ OTRecord::OTRecordType OTRecord::GetRecordType() const
 {
     return m_RecordType;
 }
+    
+bool OTRecord::IsFinalReceipt() const
+{
+    return m_bIsFinalReceipt;
+}
+    
+void OTRecord::SetFinalReceipt(bool bValue/*=true*/)
+{
+    m_bIsFinalReceipt = bValue;
+}
+
+void OTRecord::SetClosingNum(const int64_t lClosingNum)
+{
+    m_lClosingNum = lClosingNum;
+}
+    
+bool OTRecord::GetClosingNum(int64_t & lClosingNum) const
+{
+    if (!m_bIsFinalReceipt)
+        return false;
+    
+    if (0 >= m_lClosingNum)
+        return false;
+    
+    lClosingNum = m_lClosingNum;
+    return true;
+}
+    
 // For completed records (not pending.)
 //
 bool OTRecord::CanDeleteRecord() const
@@ -612,10 +640,8 @@ bool OTRecord::CanCancelOutgoing() const
                      // superfluous.)
         return false;
 
-    if (OTRecord::Transfer == GetRecordType()) // All outgoing, pending
-                                               // instruments EXCEPT
-                                               // transfer can be
-                                               // canceled.
+    if (OTRecord::Transfer == GetRecordType()) // All outgoing, pending instruments
+                                               // EXCEPT transfer can be canceled.
         return false;
 
     return true;

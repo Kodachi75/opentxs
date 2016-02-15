@@ -4190,8 +4190,7 @@ void Notary::NotarizePaymentPlan(Nym& theNym, Account& theDepositorAccount,
                 // the payment plan, but there must also be a closing number for
                 // closing it.
                 else if (!bCancelling && // If activating and:
-                         ((pPlan->GetCountClosingNumbers() <
-                           1) || // ...if there aren't enough closing numbers...
+                         ((pPlan->GetCountClosingNumbers() < 1) || // ...if there aren't enough closing numbers...
                           !server_->transactor_.verifyTransactionNumber(
                               theNym, lFoundClosingNum))) // ...or the official
                                                           // closing # isn't
@@ -4312,8 +4311,7 @@ void Notary::NotarizePaymentPlan(Nym& theNym, Account& theDepositorAccount,
                             __FUNCTION__);
                     }
                     else if (!bCancelling &&
-                             !pPlan->VerifyAgreement(*pRecipientNym,
-                                                     theNym)) // ACTIVATING
+                             !pPlan->VerifyAgreement(*pRecipientNym, theNym)) // ACTIVATING
                     {
                         Log::vOutput(
                             0, "%s: ERROR verifying Sender and Recipient on Payment Plan "
@@ -4323,9 +4321,8 @@ void Notary::NotarizePaymentPlan(Nym& theNym, Account& theDepositorAccount,
                     // This is now done above, in VerifyAgreement().
                     // We only have it here now in cases of cancellation (where
                     // VerifyAgreement isn't called.)
-                    // CANCELING
                     else if (bCancelling &&
-                             !pPlan->VerifySignature(*pRecipientNym)) {
+                             !pPlan->VerifySignature(*pRecipientNym)) { // CANCELING
                         Log::Output(0, "ERROR verifying Recipient's "
                                        "signature on Payment Plan.\n");
                     }
