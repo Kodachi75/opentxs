@@ -47,10 +47,10 @@
 #include <opentxs/ext/OTPayment.hpp>
 #include <opentxs/cash/Purse.hpp>
 #include <opentxs/cash/Token.hpp>
-#include <opentxs/basket/Basket.hpp>
+#include <opentxs/core/contract/basket/Basket.hpp>
 #include <opentxs/core/crypto/OTAsymmetricKey.hpp>
 #include <opentxs/core/Account.hpp>
-#include <opentxs/core/AssetContract.hpp>
+#include "opentxs/core/contract/UnitDefinition.hpp"
 #include <opentxs/core/crypto/OTCachedKey.hpp>
 #include <opentxs/core/Cheque.hpp>
 #include <opentxs/core/util/OTDataFolder.hpp>
@@ -62,6 +62,7 @@
 #include <opentxs/core/trade/OTMarket.hpp>
 #include <opentxs/core/Message.hpp>
 #include <opentxs/core/Proto.hpp>
+#include "opentxs/core/app/App.hpp"
 #include <opentxs/core/crypto/OTNymOrSymmetricKey.hpp>
 #include <opentxs/core/trade/OTOffer.hpp>
 #include <opentxs/core/script/OTParty.hpp>
@@ -163,7 +164,6 @@ OTServer::OTServer()
     , userCommandProcessor_(this)
     , m_bReadOnly(false)
     , m_bShutdownFlag(false)
-    , m_pServerContract()
 {
 }
 
@@ -306,10 +306,16 @@ void OTServer::Init(bool readOnly)
             NymParameters nymParameters(
                 NymParameters::SECP256K1,
                 proto::CREDTYPE_HD);
-            std::unique_ptr<Nym> serverNym(new Nym(nymParameters));
-            String nymID;
-            serverNym->GetIdentifier(nymID);
-            std::string strNymID(nymID.Get(), nymID.GetLength());
+            std::unique_ptr<Nym> newNym(new Nym(nymParameters));
+
+            if (!newNym) {
+                Log::vError("Error: Failed to create server nym\n");
+                OT_FAIL;
+            }
+            String serverNymID;
+            newNym->GetIdentifier(serverNymID);
+            newNym.reset();
+            std::string strNymID(serverNymID.Get(), serverNymID.GetLength());
 
             std::string defaultContract =
             "<notaryProviderContract version=\"2.0\">\n\n";
@@ -338,11 +344,13 @@ void OTServer::Init(bool readOnly)
             if (strContract.GetLength() < 2) {
                 otOut << __FUNCTION__ << ": Empty server contract (Failure.)\n";
                 OT_FAIL;
+            } else {
+                otOut << "Terms accepted. " << std::endl;
             }
 
             const std::string defaultHostname = "127.0.0.1";
             otOut << "Enter your new server's hostname or IP address ["
-                  << defaultHostname << "]: ";
+            << defaultHostname << "]: " << std::endl;
             std::string hostname = OT_CLI_ReadLine();
             if (5 > hostname.size())
                 hostname = defaultHostname;
@@ -352,7 +360,7 @@ void OTServer::Init(bool readOnly)
             uint32_t portNum = 0;
             uint32_t defaultPortNum = 7085;
             while (needPort) {
-                otOut << "Enter the port number for the server to listen on [" << defaultPortNum << "]: ";
+                otOut << "Enter the port number for the server to listen on [" << defaultPortNum << "]: "  << std::endl;
 
                 const std::string port = OT_CLI_ReadLine();
 
@@ -374,33 +382,23 @@ void OTServer::Init(bool readOnly)
 
             const std::string defaultName = "localhost";
             otOut << "Finally, enter a name for this server to help users "
-                  << "recognize it [" << defaultName << "]: ";
+                  << "recognize it [" << defaultName << "]: " << std::endl;
             std::string name = OT_CLI_ReadLine();
             if (1 > name.size())
                 name = defaultName;
             otOut << "Using server name: " << name << "\n";
 
-            std::unique_ptr<ServerContract> pContract(
-                ServerContract::Create(
-                    serverNym.release(),
-                    hostname,
-                    portNum,
-                    strContract.Get(),
-                    name));
+            auto pContract = App::Me().Contract().Server(
+                strNymID,
+                name,
+                strContract.Get(),
+                hostname,
+                portNum);
 
             std::string strNotaryID;
             if (pContract)
             {
-                const Nym* pContractKeyNym = pContract->PublicNym();
-
-                if (nullptr == pContractKeyNym) {
-                    otOut << __FUNCTION__ << ": Missing 'key' tag with name=\"contract\" "
-                    "and text value containing the public cert or "
-                    "public key of the signer Nym. (Please add it "
-                    "first. Failure.)\n";
-                    OT_FAIL;
-                }
-                String strHostname;
+                std::string strHostname;
                 uint32_t nPort = 0;
 
                 if (!pContract->ConnectInfo(strHostname, nPort)) {
@@ -409,7 +407,7 @@ void OTServer::Init(bool readOnly)
                     "the sample data. (Failure.)\n";
                     OT_FAIL;
                 }
-                strNotaryID = pContract->ID().Get();
+                strNotaryID = String(pContract->ID()).Get();
             } else {
                 OT_FAIL;
             }
@@ -781,18 +779,22 @@ bool OTServer::DropMessageToNymbox(const Identifier& NOTARY_ID,
     return false;
 }
 
-bool OTServer::GetConnectInfo(String& strHostname, uint32_t& nPort) const
+bool OTServer::GetConnectInfo(std::string& strHostname, uint32_t& nPort) const
 {
-    if (!m_pServerContract) return false;
+    auto contract = App::Me().Contract().Server(m_strNotaryID);
 
-    return m_pServerContract->ConnectInfo(strHostname, nPort);
+    if (!contract) { return false; }
+
+    return contract->ConnectInfo(strHostname, nPort);
 }
 
 zcert_t* OTServer::GetTransportKey() const
 {
-    OT_ASSERT(m_pServerContract);
+    auto contract = App::Me().Contract().Server(m_strNotaryID);
 
-    return m_pServerContract->PrivateTransportKey();
+    OT_ASSERT(contract);
+
+    return contract->PrivateTransportKey();
 }
 
 } // namespace opentxs

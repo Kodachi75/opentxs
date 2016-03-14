@@ -516,6 +516,7 @@ bool Log::Sleep(const std::chrono::microseconds us)
     auto end = start + us;
     do {
         std::this_thread::yield();
+        std::this_thread::sleep_for(us);
     } while (std::chrono::high_resolution_clock::now() < end);
     return true;
 }

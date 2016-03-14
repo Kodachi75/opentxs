@@ -55,14 +55,15 @@ namespace opentxs
 CryptoEngine* CryptoEngine::pInstance_ = nullptr;
 
 CryptoEngine::CryptoEngine()
-    : pSSL_(new SSLImplementation)
-#ifdef OT_CRYPTO_SUPPORTED_KEY_SECP256K1
-    , psecp256k1_(new Libsecp256k1(*pSSL_))
-#endif
-#ifdef OT_CRYPTO_USING_TREZOR
-    , pbitcoincrypto_(new TrezorCrypto())
-#endif
 {
+    pSSL_.reset(new SSLImplementation);
+    #ifdef OT_CRYPTO_SUPPORTED_KEY_SECP256K1
+    psecp256k1_.reset(new Libsecp256k1(*pSSL_));
+    #endif
+    #ifdef OT_CRYPTO_USING_TREZOR
+    pbitcoincrypto_.reset(new TrezorCrypto());
+    #endif
+
     Init();
 }
 

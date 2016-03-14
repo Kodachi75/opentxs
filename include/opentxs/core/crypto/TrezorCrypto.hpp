@@ -67,14 +67,19 @@ private:
         const HDNode& node,
         const DerivationMode privateVersion) const;
 public:
-    virtual std::string toWords(const OTPassword& seed) const;
-    virtual serializedAsymmetricKey SeedToPrivateKey(
-        const OTPassword& seed) const;
-    virtual serializedAsymmetricKey GetChild(
+    std::string toWords(const OTPassword& seed) const override;
+    void WordsToSeed(
+        const std::string words,
+        OTPassword& seed,
+        const std::string passphrase = Bip39::DEFAULT_PASSPHRASE) const override;
+    std::string SeedToFingerprint(const OTPassword& seed) const override;
+    serializedAsymmetricKey SeedToPrivateKey(
+        const OTPassword& seed) const override;
+    serializedAsymmetricKey GetChild(
         const proto::AsymmetricKey& parent,
-        const uint32_t index) const;
-    virtual serializedAsymmetricKey PrivateToPublic(
-        const proto::AsymmetricKey& key) const;
+        const uint32_t index) const override;
+    serializedAsymmetricKey PrivateToPublic(
+        const proto::AsymmetricKey& key) const override;
 };
 
 } // namespace opentxs

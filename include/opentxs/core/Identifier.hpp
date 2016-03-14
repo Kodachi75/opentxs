@@ -76,7 +76,7 @@ public:
 
     EXPORT virtual ~Identifier();
     using OTData::swap;
-    using OTData::operator=;
+    EXPORT Identifier& operator=(Identifier rhs);
     EXPORT bool operator==(const Identifier& s2) const;
     EXPORT bool operator!=(const Identifier& s2) const;
 

@@ -253,7 +253,7 @@ public:
     EXPORT ~CredentialSet();
     EXPORT bool WriteCredentials() const;
 
-    bool GetContactData(proto::ContactData& contactData) const;
+    bool GetContactData(std::shared_ptr<proto::ContactData>& contactData) const;
     void RevokeContactCredentials(std::list<std::string>& contactCredentialIDs);
     bool AddContactCredential(const proto::ContactData& contactData);
 
@@ -285,8 +285,8 @@ public:
 
     bool Verify(
         const OTData& plaintext,
-        proto::Signature& sig,
-        proto::KeyRole key = proto::KEYROLE_SIGN) const;
+        const proto::Signature& sig,
+        const proto::KeyRole key = proto::KEYROLE_SIGN) const;
     bool Verify(const proto::Verification& item) const;
     bool TransportKey(
         unsigned char* publicKey,

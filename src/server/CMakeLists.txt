@@ -41,7 +41,7 @@ else()
   )
 endif()
 
-target_link_libraries(opentxs-server PUBLIC opentxs-ext opentxs-cash opentxs-basket opentxs-core opentxs-storage PRIVATE czmq_local)
+target_link_libraries(opentxs-server PUBLIC opentxs-ext opentxs-cash opentxs-core opentxs-storage PRIVATE czmq_local)
 
 if(WIN32)
   target_link_libraries(opentxs-server PUBLIC irrxml)

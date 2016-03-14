@@ -168,13 +168,13 @@ OT_MADE_EASY_OT string
 {
     OTAPI_Func ot_Msg;
 
-    string strContract = OTAPI_Wrap::LoadAssetContract(CONTRACT_ID);
+    string strContract = OTAPI_Wrap::GetAssetType_Contract(CONTRACT_ID);
 
     if (!VerifyStringVal(strContract)) {
         string strResponse = retrieve_contract(NOTARY_ID, NYM_ID, CONTRACT_ID);
 
         if (1 == VerifyMessageSuccess(strResponse)) {
-            strContract = OTAPI_Wrap::LoadAssetContract(CONTRACT_ID);
+            strContract = OTAPI_Wrap::GetAssetType_Contract(CONTRACT_ID);
         }
     }
 
@@ -1279,10 +1279,10 @@ OT_MADE_EASY_OT int32_t MadeEasy::depositCashPurse(
         notaryID, recipientNymID, accountID, strAttempt, strResponse);
 
     if (1 == nInterpretReply) {
-        
+
         if (nullptr != pOptionalOutput)
             *pOptionalOutput = strResponse;
-        
+
         // Download all the intermediary files (account balance, inbox, outbox,
         // etc)
         // since they have probably changed from this operation.

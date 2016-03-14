@@ -114,16 +114,19 @@ PaymentCode::PaymentCode(
     serializedAsymmetricKey privatekey =
         App::Me().Crypto().BIP32().GetPaymentCode(nym);
 
-    chain_code_.Assign(
-        privatekey->chaincode().c_str(),
-        privatekey->chaincode().size());
+    if (privatekey) {
+        chain_code_.Assign(
+            privatekey->chaincode().c_str(),
+            privatekey->chaincode().size());
 
-    serializedAsymmetricKey key =
-        App::Me().Crypto().BIP32().PrivateToPublic(*privatekey);
+        serializedAsymmetricKey key =
+            App::Me().Crypto().BIP32().PrivateToPublic(*privatekey);
 
-    OTData pubkey(key->key().c_str(), key->key().size());
-
-    ConstructKey(pubkey, chain_code_);
+        if (key) {
+            OTData pubkey(key->key().c_str(), key->key().size());
+            ConstructKey(pubkey, chain_code_);
+        }
+    }
 }
 
 bool PaymentCode::operator==(const proto::PaymentCode& rhs) const

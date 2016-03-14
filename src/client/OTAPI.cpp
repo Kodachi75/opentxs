@@ -388,39 +388,36 @@ std::string OTAPI_Wrap::GetSignerNymID(const std::string& str_Contract)
     return Exec()->GetSignerNymID(str_Contract);
 }
 
-std::string OTAPI_Wrap::CalculateAssetContractID(
-    const std::string& str_Contract)
-{
-    return Exec()->CalculateAssetContractID(str_Contract);
-}
-
-std::string OTAPI_Wrap::CalculateServerContractID(
-    const std::string& str_Contract)
-{
-    return Exec()->CalculateServerContractID(str_Contract);
-}
-
 std::string OTAPI_Wrap::CalculateContractID(
     const std::string& str_Contract)
 {
     return Exec()->CalculateContractID(str_Contract);
 }
 
-std::string OTAPI_Wrap::CreateAssetContract(const std::string& NYM_ID,
-                                            const std::string& strXMLcontents)
+std::string OTAPI_Wrap::CreateCurrencyContract(
+    const std::string& NYM_ID,
+    const std::string& shortname,
+    const std::string& terms,
+    const std::string& name,
+    const std::string& symbol,
+    const std::string& tla,
+    const uint32_t power,
+    const std::string& fraction)
 {
-    return Exec()->CreateAssetContract(NYM_ID, strXMLcontents);
+    return Exec()->CreateCurrencyContract(
+        NYM_ID,
+        shortname,
+        terms,
+        name,
+        symbol,
+        tla,
+        power,
+        fraction);
 }
 
 std::string OTAPI_Wrap::GetServer_Contract(const std::string& NOTARY_ID)
 {
     return Exec()->GetServer_Contract(NOTARY_ID);
-}
-
-int32_t OTAPI_Wrap::GetCurrencyFactor(
-    const std::string& INSTRUMENT_DEFINITION_ID)
-{
-    return Exec()->GetCurrencyFactor(INSTRUMENT_DEFINITION_ID);
 }
 
 int32_t OTAPI_Wrap::GetCurrencyDecimalPower(
@@ -490,14 +487,14 @@ std::string OTAPI_Wrap::GetAssetType_Contract(
     return Exec()->GetAssetType_Contract(INSTRUMENT_DEFINITION_ID);
 }
 
-int32_t OTAPI_Wrap::AddServerContract(const std::string& strContract)
+std::string OTAPI_Wrap::AddServerContract(const std::string& strContract)
 {
     return Exec()->AddServerContract(strContract);
 }
 
-int32_t OTAPI_Wrap::AddAssetContract(const std::string& strContract)
+std::string OTAPI_Wrap::AddUnitDefinition(const std::string& strContract)
 {
-    return Exec()->AddAssetContract(strContract);
+    return Exec()->AddUnitDefinition(strContract);
 }
 
 int32_t OTAPI_Wrap::GetNymCount(void)
@@ -1553,12 +1550,6 @@ std::string OTAPI_Wrap::LoadMint(const std::string& NOTARY_ID,
     return Exec()->LoadMint(NOTARY_ID, INSTRUMENT_DEFINITION_ID);
 }
 
-std::string OTAPI_Wrap::LoadAssetContract(
-    const std::string& INSTRUMENT_DEFINITION_ID)
-{
-    return Exec()->LoadAssetContract(INSTRUMENT_DEFINITION_ID);
-}
-
 std::string OTAPI_Wrap::LoadServerContract(const std::string& NOTARY_ID)
 {
     return Exec()->LoadServerContract(NOTARY_ID);
@@ -2196,19 +2187,29 @@ int32_t OTAPI_Wrap::getAccountData(const std::string& NOTARY_ID,
     return Exec()->getAccountData(NOTARY_ID, NYM_ID, ACCT_ID);
 }
 
-std::string OTAPI_Wrap::GenerateBasketCreation(const std::string& NYM_ID,
-                                               const int64_t& MINIMUM_TRANSFER)
+std::string OTAPI_Wrap::GenerateBasketCreation(
+    const std::string& nymID,
+    const std::string& shortname,
+    const std::string& name,
+    const std::string& symbol,
+    const std::string& terms,
+    const uint64_t weight)
 {
-    return Exec()->GenerateBasketCreation(NYM_ID, MINIMUM_TRANSFER);
+    return Exec()->GenerateBasketCreation(
+        nymID,
+        shortname,
+        name,
+        symbol,
+        terms,
+        weight);
 }
 
 std::string OTAPI_Wrap::AddBasketCreationItem(
-    const std::string& NYM_ID, const std::string& THE_BASKET,
-    const std::string& INSTRUMENT_DEFINITION_ID,
-    const int64_t& MINIMUM_TRANSFER)
+    const std::string& basketTemplate,
+    const std::string& currencyID,
+    const uint64_t& weight)
 {
-    return Exec()->AddBasketCreationItem(
-        NYM_ID, THE_BASKET, INSTRUMENT_DEFINITION_ID, MINIMUM_TRANSFER);
+    return Exec()->AddBasketCreationItem(basketTemplate, currencyID, weight);
 }
 
 int32_t OTAPI_Wrap::issueBasket(const std::string& NOTARY_ID,

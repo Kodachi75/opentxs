@@ -36,16 +36,15 @@
  *
  ************************************************************/
 
-#include <opentxs/core/stdafx.hpp>
+#include "opentxs/core/contract/Signable.hpp"
 
-#include <opentxs/basket/BasketItem.hpp>
+#include "opentxs/core/Nym.hpp"
 
 namespace opentxs
 {
 
-BasketItem::BasketItem()
-    : lMinimumTransferAmount(0)
-    , lClosingTransactionNo(0)
+Signable::Signable(const ConstNym& nym)
+    : nym_(nym)
 {
 }
 

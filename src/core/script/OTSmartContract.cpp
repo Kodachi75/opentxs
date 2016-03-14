@@ -316,7 +316,7 @@ SmartContract, except you are registering an
     OTTitle for a static piece of property, versus activating an OTCronItem that
 processes and triggers repeatedly
     over time. OTTitle will probably derive from Contract, in the same way
-that OTAssetContract derives from
+that OTUnitDefinition derives from
     Contract. You will be able to register title on a server similar to
 registering an asset contract. Except,
     instead of getting an issuer acct, you get a deed...
@@ -420,13 +420,13 @@ on holder of Deed.
 have proven the first SMART CONTRACT (Escrow!!!!!)
 
 
-===> NEW THOUGHT:  I think OTAssetContract should be derived from OTScriptable
+===> NEW THOUGHT:  I think OTUnitDefinition should be derived from OTScriptable
 instead of Contract. There's no reason why an
      issuer shouldn't be able to attach scripts to certain aspects of a
 currency, right? Hooks could trigger at various currency-related
      events.  There's also no reason why an issued currency shouldn't be able to
 have parties. But who are the parties, if not the issuer?
-     In the case of OTAssetContract, the parties will be whoever are configured
+     In the case of OTUnitDefinition, the parties will be whoever are configured
 to do whatever the clauses need them to do, which will often
      be nothing, though technically they could be used for AUTOMATED BAILMENT
 PROCESSES!! (Say one of the parties is a voting group consisting
@@ -436,7 +436,7 @@ PROCESSES!! (Say one of the parties is a voting group consisting
 people might use this, but it seems potentially useful.
 
  ===> Once this is in place, then it's easy to have OTEntity be derived from
-OTAssetContract!!  And that's where we'll get our Entity ID.
+OTUnitDefinition!!  And that's where we'll get our Entity ID.
 
  ===> ANOTHER IDEA:  SHould be easy to move funds ONTO THE SMART CONTRACT
 ITSELF. Just have an XML tag where stored funds go, perhaps with the

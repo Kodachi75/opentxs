@@ -1200,7 +1200,7 @@ bool OTAgreement::SetProposal(Nym& MERCHANT_NYM, Account& MERCHANT_ACCT,
 //
 // (Transaction number and closing number are retrieved from Nym at this time.)
 bool OTAgreement::Confirm(Nym& PAYER_NYM, Account& PAYER_ACCT,
-                          Nym* pMERCHANT_NYM,
+                          const Nym* pMERCHANT_NYM,
                           const Identifier* p_id_MERCHANT_NYM)
 {
 

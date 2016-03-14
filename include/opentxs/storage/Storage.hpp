@@ -44,11 +44,13 @@
 #include <functional>
 #include <iostream>
 #include <limits>
+#include <list>
 #include <map>
 #include <memory>
 #include <mutex>
 #include <string>
 #include <thread>
+#include <tuple>
 
 #include <opentxs-proto/verify/VerifyCredentials.hpp>
 #include <opentxs-proto/verify/VerifyContacts.hpp>
@@ -66,6 +68,7 @@ typedef std::function<std::string()>
     Random;
 typedef std::function<void(const proto::CredentialIndex&)> NymLambda;
 typedef std::function<void(const proto::ServerContract&)> ServerLambda;
+typedef std::function<void(const proto::UnitDefinition&)> UnitLambda;
 
 template<class T>
 std::string ProtoAsString(const T& serialized)
@@ -112,8 +115,11 @@ bool LoadProto(
     std::shared_ptr<T>& serialized,
     const bool checking = false)
 {
-    if (hash.empty() &&!checking) {
-        std::cout << "Error:: Tried to load empty key" << std::endl;
+    if (hash.empty()) {
+        if (!checking) {
+            std::cout << "Error:: Tried to load empty key" << std::endl;
+        }
+
         return false;
     }
 
@@ -129,42 +135,80 @@ bool LoadProto(
     std::lock_guard<std::mutex> bucketLock(bucket_lock_);
     bool foundInPrimary = false;
     if (Load(hash, data, attemptFirst)) {
-        serialized.reset(new T);
-        serialized->ParseFromArray(data.c_str(), data.size());
+        if (1 < data.size()) {
+            serialized.reset(new T);
+            serialized->ParseFromArray(data.c_str(), data.size());
 
-        foundInPrimary = proto::Check<T>(*serialized, 0, 0xFFFFFFFF);
+            foundInPrimary = proto::Check<T>(*serialized, 0, 0xFFFFFFFF);
+        }
     }
 
     bool foundInSecondary = false;
     if (!foundInPrimary) {
         // try again in the other bucket
         if (Load(hash, data, !attemptFirst)) {
-            serialized.reset(new T);
-            serialized->ParseFromArray(data.c_str(), data.size());
+            if (1 < data.size()) {
+                serialized.reset(new T);
+                serialized->ParseFromArray(data.c_str(), data.size());
 
-            foundInSecondary = proto::Check<T>(*serialized, 0, 0xFFFFFFFF);
+                foundInSecondary = proto::Check<T>(*serialized, 0, 0xFFFFFFFF);
+            }
         }
+    }
+
+    if (!foundInPrimary && !foundInSecondary && !checking) {
+        std::cerr << "Failed loading object" << std::endl
+                  << "Hash: " << hash << std::endl
+                  << "Size: " << data.size() << std::endl;
     }
 
     return (foundInPrimary || foundInSecondary);
 }
 
 template<class T>
-bool StoreProto(const T& data)
+bool StoreProto(const T& data, std::string& key, std::string& plaintext)
 {
     if (nullptr != digest_) {
-        const std::string plaintext = opentxs::ProtoAsString<T>(data);
-        std::string key;
+        plaintext = opentxs::ProtoAsString<T>(data);
         digest_(Storage::HASH_TYPE, plaintext, key);
 
         return Store(
             key,
             plaintext,
-            current_bucket_);
+            current_bucket_.load());
     }
     return false;
 }
+
+template<class T>
+bool StoreProto(const T& data, std::string& key)
+{
+    std::string notUsed;
+
+    return StoreProto<T>(data, key, notUsed);
+}
+
+template<class T>
+bool StoreProto(const T& data)
+{
+    std::string notUsed;
+
+    return StoreProto<T>(data, notUsed);
+}
+
 private:
+    /** A set of metadata associated with a stored object
+     *  * string: hash
+     *  * string: alias
+     */
+    typedef std::pair<std::string, std::string> Metadata;
+
+    /** Maps a logical id to the stored metadata for the object
+     *  * string: id of the stored object
+     *  * Metadata: metadata for the stored object
+     */
+    typedef std::map<std::string, Metadata> Index;
+
     static Storage* instance_pointer_;
 
     std::thread* gc_thread_ = nullptr;
@@ -182,14 +226,41 @@ private:
                                              // may destruct during execution
     void RunMapServers(ServerLambda lambda); // copy the lambda since original
                                              // may destruct during execution
+    void RunMapUnits(UnitLambda lambda);     // copy the lambda since original
+                                             // may destruct during execution
     // Methods for updating index objects
-    bool UpdateNymCreds(const std::string& id, const std::string& hash);
     bool UpdateCredentials(const std::string& id, const std::string& hash);
-    bool UpdateNyms(const proto::StorageNym& nym);
-    bool UpdateServers(const std::string& id, const std::string& hash);
+    bool UpdateNymCreds(
+        const std::string& id,
+        const std::string& hash,
+        const std::string& alias);
+    bool UpdateNym(const proto::StorageNym& nym, const std::string& alias);
+    bool UpdateNymAlias(const std::string& id, const std::string& alias);
+    bool UpdateNyms(std::unique_lock<std::mutex>& nymLock);
+    bool UpdateSeed(
+        const std::string& id,
+        const std::string& hash,
+        const std::string& alias);
+    bool UpdateSeedAlias(const std::string& id, const std::string& alias);
+    bool UpdateSeedDefault(const std::string& id);
+    bool UpdateSeeds(std::unique_lock<std::mutex>& seedlock);
+    bool UpdateServer(
+        const std::string& id,
+        const std::string& hash,
+        const std::string& alias);
+    bool UpdateServerAlias(const std::string& id, const std::string& alias);
+    bool UpdateServers(std::unique_lock<std::mutex>& serverlock);
+    bool UpdateUnit(
+        const std::string& id,
+        const std::string& hash,
+        const std::string& alias);
+    bool UpdateUnitAlias(const std::string& id, const std::string& alias);
+    bool UpdateUnits(std::unique_lock<std::mutex>& unitlock);
     bool UpdateItems(const proto::StorageCredentials& creds);
     bool UpdateItems(const proto::StorageNymList& nyms);
+    bool UpdateItems(const proto::StorageSeeds& seeds);
     bool UpdateItems(const proto::StorageServers& servers);
+    bool UpdateItems(const proto::StorageUnits& units);
     bool UpdateRoot(const proto::StorageItems& items);
     bool UpdateRoot(proto::StorageRoot& root, const std::string& gcroot);
     bool UpdateRoot();
@@ -203,25 +274,31 @@ protected:
     Random random_;
 
     std::mutex init_lock_; // controls access to Read() method
-    std::mutex cred_lock_; // ensures atomic writes to credentials_
-    std::mutex nym_lock_; // ensures atomic writes to nyms_
-    std::mutex server_lock_; // ensures atomic writes to servers_
-    std::mutex write_lock_; // ensure atomic writes
-    std::mutex gc_lock_; // prevents multiple garbage collection threads
     std::mutex bucket_lock_; // ensures buckets not changed during read
+    std::mutex cred_lock_; // ensures atomic writes to credentials_
+    std::mutex default_seed_lock_; // ensures atomic writes to default_seed_
+    std::mutex gc_lock_; // prevents multiple garbage collection threads
+    std::mutex nym_lock_; // ensures atomic writes to nyms_
+    std::mutex seed_lock_; // ensures atomic writes to seeds_
+    std::mutex server_lock_; // ensures atomic writes to servers_
+    std::mutex unit_lock_; // ensures atomic writes to units_
+    std::mutex write_lock_; // ensure atomic writes
 
     std::string root_hash_;
     std::string old_gc_root_; // used if a previous run of gc did not finish
     std::string items_;
+    std::string default_seed_;
 
     std::atomic<bool> current_bucket_;
     std::atomic<bool> isLoaded_;
     std::atomic<bool> gc_running_;
     std::atomic<bool> gc_resume_;
     int64_t last_gc_ = 0;
-    std::map<std::string, std::string> credentials_{{}};
-    std::map<std::string, std::string> nyms_{{}};
-    std::map<std::string, std::string> servers_{{}};
+    Index credentials_;
+    Index nyms_;
+    Index seeds_;
+    Index servers_;
+    Index units_;
 
     Storage(
         const StorageConfig& config,
@@ -244,15 +321,40 @@ protected:
     virtual bool EmptyBucket(const bool bucket) = 0;
 
 public:
+    /** A list of object IDs and their associated aliases
+     *  * string: id of the stored object
+     *  * string: alias of the stored object
+     */
+    typedef std::list<std::pair<std::string, std::string>> ObjectList;
+
     // Method for instantiating the singleton.
     static Storage& It(
         const Digest& hash,
         const Random& random,
         const StorageConfig& config);
 
+    std::string DefaultSeed();
     bool Load(
         const std::string& id,
         std::shared_ptr<proto::Credential>& cred,
+        const bool checking = false); // If true, suppress "not found" errors
+    bool Load(
+        const std::string& id,
+        std::shared_ptr<proto::CredentialIndex>& nym,
+        const bool checking = false); // If true, suppress "not found" errors
+    bool Load(
+        const std::string& id,
+        std::shared_ptr<proto::CredentialIndex>& nym,
+        std::string& alias,
+        const bool checking = false); // If true, suppress "not found" errors
+    bool Load(
+        const std::string& id,
+        std::shared_ptr<proto::Seed>& seed,
+        const bool checking = false); // If true, suppress "not found" errors
+    bool Load(
+        const std::string& id,
+        std::shared_ptr<proto::Seed>& seed,
+        std::string& alias,
         const bool checking = false); // If true, suppress "not found" errors
     bool Load(
         const std::string& id,
@@ -260,14 +362,38 @@ public:
         const bool checking = false); // If true, suppress "not found" errors
     bool Load(
         const std::string& id,
-        std::shared_ptr<proto::CredentialIndex>& cred,
+        std::shared_ptr<proto::ServerContract>& contract,
+        std::string& alias,
+        const bool checking = false); // If true, suppress "not found" errors
+    bool Load(
+        const std::string& id,
+        std::shared_ptr<proto::UnitDefinition>& contract,
+        const bool checking = false); // If true, suppress "not found" errors
+    bool Load(
+        const std::string& id,
+        std::shared_ptr<proto::UnitDefinition>& contract,
+        std::string& alias,
         const bool checking = false); // If true, suppress "not found" errors
     void MapPublicNyms(NymLambda& lambda);
     void MapServers(ServerLambda& lambda);
+    void MapUnitDefinitions(UnitLambda& lambda);
+    bool RemoveServer(const std::string& id);
+    bool RemoveUnitDefinition(const std::string& id);
     void RunGC();
+    std::string ServerAlias(const std::string& id);
+    ObjectList ServerList();
+    bool SetDefaultSeed(const std::string& id);
+    bool SetNymAlias(const std::string& id, const std::string& alias);
+    bool SetSeedAlias(const std::string& id, const std::string& alias);
+    bool SetServerAlias(const std::string& id, const std::string& alias);
+    bool SetUnitDefinitionAlias(const std::string& id, const std::string& alias);
     bool Store(const proto::Credential& data);
-    bool Store(const proto::ServerContract& data);
-    bool Store(const proto::CredentialIndex& data);
+    bool Store(const proto::CredentialIndex& data, const std::string alias="");
+    bool Store(const proto::Seed& data, const std::string alias="");
+    bool Store(const proto::ServerContract& data, const std::string alias="");
+    bool Store(const proto::UnitDefinition& data, const std::string alias="");
+    std::string UnitDefinitionAlias(const std::string& id);
+    ObjectList UnitDefinitionList();
 
     virtual void Cleanup();
     virtual ~Storage();

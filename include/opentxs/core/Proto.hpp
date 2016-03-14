@@ -42,6 +42,7 @@
 #include <opentxs/core/Proto.hpp>
 
 #include "OTData.hpp"
+#include "crypto/OTASCIIArmor.hpp"
 #include "util/Assert.hpp"
 
 namespace opentxs
@@ -75,6 +76,44 @@ std::string ProtoAsString(const T& serialized)
     delete[] protoArray;
     return serializedData;
 }
+
+template<class T>
+String ProtoAsArmored(const T& serialized, const String& header)
+{
+    auto data = ProtoAsData<T>(serialized);
+    OTASCIIArmor armored(data);
+    String output;
+    armored.WriteArmoredString(output, header.Get());
+
+    return output;
+}
+
+template<class T>
+T DataToProto(const OTData& input)
+{
+    T serialized;
+    serialized.ParseFromArray(input.GetPointer(), input.GetSize());
+
+    return serialized;
+}
+
+template<class T>
+T StringToProto(const String& input)
+{
+    OTASCIIArmor armored;
+    String unconstInput(input);
+
+    if (!armored.LoadFromString(unconstInput)) {
+        std::cerr << __FUNCTION__ << "Failed to decode armored protobuf."
+                  << std::endl;
+
+        return T();
+    } else {
+
+        return DataToProto<T>(OTData(armored));
+    }
+}
+
 } // namespace proto
 } // namespace opentxs
 

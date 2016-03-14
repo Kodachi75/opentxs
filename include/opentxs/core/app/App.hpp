@@ -36,25 +36,35 @@
  *
  ************************************************************/
 
+/**\defgroup native Native API
+ *
+ */
+
 #ifndef OPENTXS_CORE_APP_APP_HPP
 #define OPENTXS_CORE_APP_APP_HPP
 
+#include <atomic>
 #include <chrono>
 #include <functional>
 #include <limits>
 #include <list>
+#include <memory>
 #include <thread>
 #include <tuple>
 
 #include <opentxs/storage/Storage.hpp>
 #include <opentxs/core/app/Dht.hpp>
 #include <opentxs/core/app/Settings.hpp>
+#include <opentxs/core/app/Wallet.hpp>
 #include <opentxs/core/crypto/CryptoEngine.hpp>
 
 namespace opentxs
 {
 
-//Singlton class for providing an interface to process-level resources.
+//
+/** \brief Singlton class for providing an interface to process-level resources.
+ *  \ingroup native
+ */
 class App
 {
 public:
@@ -71,17 +81,19 @@ private:
     CryptoEngine* crypto_ = nullptr;
     Dht* dht_ = nullptr;
     Storage* storage_ = nullptr;
-
-    std::thread* periodic_thread_ = nullptr;
+    std::unique_ptr<Wallet> contract_manager_;
 
     std::mutex task_list_lock_;
 
     bool server_mode_ = false;
+    std::atomic<bool> shutdown_;
     TaskList periodic_task_list;
     int64_t nym_publish_interval_ = std::numeric_limits<int64_t>::max();
     int64_t nym_refresh_interval_ = std::numeric_limits<int64_t>::max();
     int64_t server_publish_interval_ = std::numeric_limits<int64_t>::max();
     int64_t server_refresh_interval_ = std::numeric_limits<int64_t>::max();
+    int64_t unit_publish_interval_ = std::numeric_limits<int64_t>::max();
+    int64_t unit_refresh_interval_ = std::numeric_limits<int64_t>::max();
 
     App(const bool serverMode);
     App() = delete;
@@ -91,6 +103,7 @@ private:
     void Periodic();
 
     void Init_Config();
+    void Init_Contracts();
     void Init_Crypto();
     void Init_Storage();
     void Init_Dht();
@@ -101,6 +114,7 @@ public:
     static App& Me(const bool serverMode = false);
 
     Settings& Config();
+    Wallet& Contract();
     CryptoEngine& Crypto();
     Storage& DB();
     Dht& DHT();

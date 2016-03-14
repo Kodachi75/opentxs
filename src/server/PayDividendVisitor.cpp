@@ -88,7 +88,7 @@ PayDividendVisitor::~PayDividendVisitor()
 // is called in order to pay a dividend to the Nym who owns that account.
 
 // PayDividendVisitor::Trigger() is used in
-// OTAssetContract::VisitAccountRecords()
+// OTUnitDefinition::VisitAccountRecords()
 // cppcheck-suppress unusedFunction
 bool PayDividendVisitor::Trigger(Account& theSharesAccount) // theSharesAccount
                                                             // is, say, a Pepsi

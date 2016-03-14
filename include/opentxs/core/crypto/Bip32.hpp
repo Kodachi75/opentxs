@@ -62,6 +62,8 @@ class OTPassword;
 class Bip32
 {
 public:
+    virtual std::string SeedToFingerprint(
+        const OTPassword& seed) const = 0;
     virtual serializedAsymmetricKey SeedToPrivateKey(
         const OTPassword& seed) const = 0;
     virtual serializedAsymmetricKey GetChild(
@@ -71,7 +73,7 @@ public:
         const proto::AsymmetricKey& key) const = 0;
 
     BinarySecret GetHDSeed() const;
-    serializedAsymmetricKey GetHDKey(const proto::HDPath path) const;
+    serializedAsymmetricKey GetHDKey(proto::HDPath& path) const;
     serializedAsymmetricKey GetPaymentCode(const uint32_t nym) const;
 
 };

@@ -39,7 +39,12 @@
 #ifndef OPENTXS_CORE_CRYPTO_BIP39_HPP
 #define OPENTXS_CORE_CRYPTO_BIP39_HPP
 
+#include <memory>
 #include <string>
+
+#include <opentxs-proto/verify/VerifyCredentials.hpp>
+
+#include "opentxs/core/crypto/CryptoSymmetric.hpp"
 
 namespace opentxs
 {
@@ -47,11 +52,27 @@ class OTPassword;
 
 class Bip39
 {
+private:
+    static const CryptoSymmetric::Mode DEFAULT_ENCRYPTION_MODE;
+
+    std::string SaveSeed(const std::string& words, const std::string& passphrase);
+    bool SeedToData(const proto::Seed& seed, OTPassword& output) const;
 
 public:
+    static const std::string DEFAULT_PASSPHRASE;
+
+    std::string ImportSeed(
+        const std::string& words,
+        const std::string& passphrase);
+    std::string NewSeed();
+    std::shared_ptr<OTPassword> Seed(std::string& fingerprint);
 
     virtual std::string toWords(
         const OTPassword& seed) const = 0;
+    virtual void WordsToSeed(
+        const std::string words,
+        OTPassword& seed,
+        const std::string passphrase = DEFAULT_PASSPHRASE) const = 0;
 };
 
 } // namespace opentxs

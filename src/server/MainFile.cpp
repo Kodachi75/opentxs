@@ -49,7 +49,7 @@
 #include <opentxs/core/Identifier.hpp>
 #include <opentxs/core/Contract.hpp>
 #include <opentxs/core/contract/ServerContract.hpp>
-#include <opentxs/core/AssetContract.hpp>
+#include "opentxs/core/contract/UnitDefinition.hpp"
 #include <opentxs/core/crypto/OTPassword.hpp>
 #include <opentxs/core/OTStorage.hpp>
 #include <opentxs/core/util/OTFolders.hpp>
@@ -90,15 +90,6 @@ bool MainFile::SaveMainFileToString(String& strMainFile)
             Log::vError(
                 "%s: Failed trying to write master key to notary file.\n",
                 __FUNCTION__);
-    }
-
-    for (auto& it : server_->transactor_.contractsMap_) {
-        Contract* pContract = it.second;
-        OT_ASSERT_MSG(nullptr != pContract,
-                      "nullptr contract pointer in MainFile::SaveMainFile.\n");
-
-        // This is like the Server's wallet.
-        pContract->SaveContractWallet(tag);
     }
 
     // Save the basket account information
@@ -447,62 +438,6 @@ bool MainFile::LoadMainFile(bool bReadOnly)
                                     strBasketID.Get(), strBasketAcctID.Get());
                 }
 
-                // Create an OTAssetContract and load them from file, (for each
-                // instrument definition),
-                // and add them to the internal map.
-                else if (strNodeName.Compare("assetType")) {
-                    OTASCIIArmor ascAssetName = xml->getAttributeValue("name");
-
-                    if (ascAssetName.Exists())
-                        ascAssetName.GetString(AssetName,
-                                               false); // linebreaks == false
-
-                    InstrumentDefinitionID = xml->getAttributeValue(
-                        "instrumentDefinitionID"); // hash of contract itself
-
-                    Log::vOutput(0, "\n\n****Asset Contract**** (server "
-                                    "listing)\n Name: %s\n Contract ID: %s\n",
-                                 AssetName.Get(), InstrumentDefinitionID.Get());
-
-                    String strContractPath;
-                    strContractPath = OTFolders::Contract().Get();
-
-                    AssetContract* pContract = new AssetContract(
-                        AssetName, strContractPath, InstrumentDefinitionID,
-                        InstrumentDefinitionID);
-
-                    OT_ASSERT_MSG(nullptr != pContract,
-                                  "ASSERT: allocating memory for Asset "
-                                  "Contract in MainFile::LoadMainFile\n");
-
-                    if (pContract->LoadContract()) {
-                        if (pContract->VerifyContract()) {
-                            Log::Output(0, "** Asset Contract Verified **\n");
-
-                            pContract->SetName(AssetName);
-
-                            server_->transactor_
-                                .contractsMap_[InstrumentDefinitionID.Get()] =
-                                pContract;
-                            App::Me().DHT().Insert(
-                                InstrumentDefinitionID.Get(),
-                                *pContract);
-                        }
-                        else {
-                            delete pContract;
-                            pContract = nullptr;
-                            Log::Output(0,
-                                        "Asset Contract FAILED to verify.\n");
-                        }
-                    }
-                    else {
-                        delete pContract;
-                        pContract = nullptr;
-                        Log::vOutput(
-                            0, "%s: Failed reading file for Asset Contract.\n",
-                            __FUNCTION__);
-                    }
-                }
                 else {
                     // unknown element type
                     Log::vError("%s: Unknown element type: %s\n", __FUNCTION__,
@@ -574,22 +509,10 @@ bool MainFile::LoadServerUserAndContract()
                         szFunc);
         Log::vOutput(0, "%s: Loading the server contract...\n", szFunc);
 
-        std::shared_ptr<proto::ServerContract> serialized;
-        App::Me().DB().Load(server_->m_strNotaryID.Get(), serialized);
-
-
-        if (!serialized) { return false; }
-
-        std::unique_ptr<ServerContract>
-            pContract(ServerContract::Factory(*serialized));
-
-        OT_ASSERT_MSG(pContract,
-                      "ASSERT while allocating memory for main Server Contract "
-                      "in MainFile::LoadServerUserAndContract\n");
+        auto pContract = App::Me().Contract().Server(NOTARY_ID);
 
         if (pContract) {
             Log::Output(0, "\n** Main Server Contract Verified **\n");
-            server_->m_pServerContract.swap(pContract);
             bSuccess = true;
         }
         else {

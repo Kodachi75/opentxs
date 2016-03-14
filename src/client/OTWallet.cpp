@@ -46,7 +46,7 @@
 #include <opentxs/cash/Purse.hpp>
 
 #include <opentxs/core/Account.hpp>
-#include <opentxs/core/AssetContract.hpp>
+#include "opentxs/core/contract/UnitDefinition.hpp"
 #include <opentxs/core/app/App.hpp>
 #include <opentxs/core/crypto/OTCachedKey.hpp>
 #include <opentxs/core/util/OTDataFolder.hpp>
@@ -55,7 +55,6 @@
 #include <opentxs/core/crypto/OTPassword.hpp>
 #include <opentxs/core/crypto/OTPasswordData.hpp>
 #include <opentxs/core/Nym.hpp>
-#include <opentxs/core/contract/ServerContract.hpp>
 #include <opentxs/core/OTStorage.hpp>
 #include <opentxs/core/crypto/OTSymmetricKey.hpp>
 #include <opentxs/core/util/Tag.hpp>
@@ -91,44 +90,7 @@ void OTWallet::Release()
         m_mapPrivateNyms.erase(m_mapPrivateNyms.begin());
     }
 
-    while (!m_mapPublicNyms.empty()) {
-        Nym* pNym = m_mapPublicNyms.begin()->second;
-
-        OT_ASSERT(nullptr != pNym);
-
-        delete pNym;
-        pNym = nullptr;
-
-        m_mapPublicNyms.erase(m_mapPublicNyms.begin());
-    }
-
-    // 2) Go through the map of Contracts and delete them. (They were
-    // dynamically allocated.)
-    while (!m_mapContracts.empty()) {
-        AssetContract* pContract = m_mapContracts.begin()->second;
-
-        OT_ASSERT(nullptr != pContract);
-
-        delete pContract;
-        pContract = nullptr;
-
-        m_mapContracts.erase(m_mapContracts.begin());
-    }
-
-    // 3) Go through the map of Servers and delete them. (They were dynamically
-    // allocated.)
-    while (!m_mapServers.empty()) {
-        ServerContract* pContract = m_mapServers.begin()->second;
-
-        OT_ASSERT(nullptr != pContract);
-
-        delete pContract;
-        pContract = nullptr;
-
-        m_mapServers.erase(m_mapServers.begin());
-    }
-
-    // 4) Go through the map of Accounts and delete them. (They were dynamically
+    // 2) Go through the map of Accounts and delete them. (They were dynamically
     // allocated.)
     while (!m_mapAccounts.empty()) {
         Account* pAccount = m_mapAccounts.begin()->second;
@@ -179,7 +141,7 @@ bool OTWallet::SignContractWithFirstNymOnList(Contract& theContract)
 
         if (GetNym(0, // index 0
                    NYM_ID, NYM_NAME)) {
-            Nym* pNym = GetNymByID(NYM_ID);
+            Nym* pNym = GetPrivateNymByID(NYM_ID);
 
             if (nullptr != pNym) {
                 theContract.SignContract(*pNym);
@@ -206,7 +168,7 @@ Nym * OTWallet::CreateNym(const NymParameters& nymParameters)
     OT_ASSERT(nullptr != pNym);
 
     if (pNym->VerifyPseudonym()) {
-        this->AddNym(*pNym); // Add our new nym to the wallet, who "owns" it hereafter.
+        this->AddPrivateNym(*pNym); // Add our new nym to the wallet, who "owns" it hereafter.
 
         // Note: It's already on the master key. To prevent that, we would have had
         // to PAUSE the master key before calling GenerateNym above. So the below
@@ -232,38 +194,12 @@ Nym * OTWallet::CreateNym(const NymParameters& nymParameters)
 
 }
 
-Nym* OTWallet::GetNymByID(const Identifier& NYM_ID)
-{
-    Nym* p = GetPrivateNymByID(NYM_ID);
-    if (p) return p;
-    return GetPublicNymByID(NYM_ID);
-}
-
 // The wallet presumably has multiple Nyms listed within.
 // I should be able to pass in a Nym ID and, if the Nym is there,
 // the wallet returns a pointer to that nym.
 Nym* OTWallet::GetPrivateNymByID(const Identifier& NYM_ID)
 {
     for (auto& it : m_mapPrivateNyms) {
-        Nym* pNym = it.second;
-        OT_ASSERT_MSG((nullptr != pNym),
-                      "nullptr pseudonym pointer in OTWallet::GetNymByID.");
-
-        Identifier id_CurrentNym;
-        pNym->GetIdentifier(id_CurrentNym);
-
-        if (id_CurrentNym == NYM_ID) return pNym;
-    }
-
-    return nullptr;
-}
-
-// The wallet presumably has multiple Nyms listed within.
-// I should be able to pass in a Nym ID and, if the Nym is there,
-// the wallet returns a pointer to that nym.
-Nym* OTWallet::GetPublicNymByID(const Identifier& NYM_ID)
-{
-    for (auto& it : m_mapPublicNyms) {
         Nym* pNym = it.second;
         OT_ASSERT_MSG((nullptr != pNym),
                       "nullptr pseudonym pointer in OTWallet::GetNymByID.");
@@ -305,9 +241,7 @@ Nym* OTWallet::GetNymByIDPartialMatch(std::string PARTIAL_ID) // works
             (nullptr != pNym),
             "nullptr pseudonym pointer in OTWallet::GetNymByIDPartialMatch.");
 
-        String strNymName;
-        strNymName.Set(pNym->GetNymName());
-        std::string str_NymName = strNymName.Get();
+        std::string str_NymName = pNym->Alias();
 
         if (str_NymName.compare(0, PARTIAL_ID.length(), PARTIAL_ID) == 0)
             return pNym;
@@ -320,16 +254,6 @@ Nym* OTWallet::GetNymByIDPartialMatch(std::string PARTIAL_ID) // works
 int32_t OTWallet::GetNymCount()
 {
     return static_cast<int32_t>(m_mapPrivateNyms.size());
-}
-
-int32_t OTWallet::GetServerCount()
-{
-    return static_cast<int32_t>(m_mapServers.size());
-}
-
-int32_t OTWallet::GetAssetTypeCount()
-{
-    return static_cast<int32_t>(m_mapContracts.size());
 }
 
 int32_t OTWallet::GetAccountCount()
@@ -353,60 +277,7 @@ bool OTWallet::GetNym(int32_t iIndex, Identifier& NYM_ID, String& NYM_NAME)
 
             if (iIndex == iCurrentIndex) {
                 pNym->GetIdentifier(NYM_ID);
-                NYM_NAME.Set(pNym->GetNymName());
-                return true;
-            }
-        }
-    }
-
-    return false;
-}
-
-// used by high-level wrapper.
-bool OTWallet::GetServer(int32_t iIndex, Identifier& THE_ID, String& THE_NAME)
-{
-    // if iIndex is within proper bounds (0 through count minus 1)
-    if (iIndex < GetServerCount() && iIndex >= 0) {
-        int32_t iCurrentIndex = (-1);
-
-        for (auto& it : m_mapServers) {
-            ServerContract* pServer = it.second;
-            OT_ASSERT(nullptr != pServer);
-
-            iCurrentIndex++; // On first iteration, this becomes 0 here. (For 0
-                             // index.) Increments thereafter.
-
-            if (iIndex == iCurrentIndex) // if not null
-            {
-                THE_ID = pServer->ID();
-                THE_NAME = pServer->Name();
-                return true;
-            }
-        }
-    }
-
-    return false;
-}
-
-// used by high-level wrapper.
-bool OTWallet::GetAssetType(int32_t iIndex, Identifier& THE_ID,
-                            String& THE_NAME)
-{
-    // if iIndex is within proper bounds (0 through count minus 1)
-    if (iIndex < GetAssetTypeCount() && iIndex >= 0) {
-        int32_t iCurrentIndex = (-1);
-
-        for (auto& it : m_mapContracts) {
-            AssetContract* pAssetType = it.second;
-            OT_ASSERT(nullptr != pAssetType);
-
-            iCurrentIndex++; // On first iteration, this becomes 0 here. (For 0
-                             // index.) Increments thereafter.
-
-            if (iIndex == iCurrentIndex) // if not null
-            {
-                pAssetType->GetIdentifier(THE_ID);
-                pAssetType->GetName(THE_NAME);
+                NYM_NAME.Set(pNym->Alias());
                 return true;
             }
         }
@@ -459,32 +330,6 @@ void OTWallet::DisplayStatistics(String& strOutput)
     }
 
     strOutput.Concatenate(
-        "\n-------------------------------------------------\n");
-    strOutput.Concatenate("ASSET CONTRACTS:\n\n");
-
-    for (auto& it : m_mapContracts) {
-        Contract* pContract = it.second;
-        OT_ASSERT_MSG(nullptr != pContract, "nullptr contract pointer in "
-                                            "OTWallet::m_mapContracts, "
-                                            "OTWallet::DisplayStatistics");
-
-        pContract->DisplayStatistics(strOutput);
-    }
-
-    strOutput.Concatenate(
-        "-------------------------------------------------\n");
-    strOutput.Concatenate("SERVER CONTRACTS:\n\n");
-
-    for (auto& it : m_mapServers) {
-        ServerContract* pServer = it.second;
-        OT_ASSERT_MSG(nullptr != pServer, "nullptr server pointer in "
-                                          "OTWallet::m_mapServers, "
-                                          "OTWallet::DisplayStatistics");
-
-        pServer->Statistics(strOutput);
-    }
-
-    strOutput.Concatenate(
         "-------------------------------------------------\n");
     strOutput.Concatenate("ACCOUNTS:\n\n");
 
@@ -512,25 +357,12 @@ void OTWallet::AddPrivateNym(const Nym& theNym)
     AddNym(theNym, m_mapPrivateNyms);
 }
 
-void OTWallet::AddPublicNym(const Nym& theNym)
-{
-    AddNym(theNym, m_mapPublicNyms);
-}
-
-void OTWallet::AddNym(const Nym& theNym)
-{
-    if (theNym.HasPrivateKey())
-        AddPrivateNym(theNym);
-    else
-        AddPublicNym(theNym);
-}
-
 void OTWallet::AddNym(const Nym& theNym, mapOfNyms& map)
 {
     const Identifier NYM_ID(theNym);
     Identifier aNymID;
 
-    String strName;
+    std::string strName;
 
     for (auto it(map.begin()); it != map.end(); ++it) {
         Nym* pNym = it->second;
@@ -539,10 +371,7 @@ void OTWallet::AddNym(const Nym& theNym, mapOfNyms& map)
         pNym->GetIdentifier(aNymID);
 
         if (aNymID == NYM_ID) {
-            String strTemp(pNym->GetNymName());
-            strName = strTemp; // todo optimize. currently am fixing "blank nym
-                               // name" bug.
-
+            strName = pNym->Alias();
             map.erase(it);
 
             // Don't delete it if they are physically the same object.
@@ -558,7 +387,7 @@ void OTWallet::AddNym(const Nym& theNym, mapOfNyms& map)
     const String strNymID(NYM_ID);
     map[strNymID.Get()] = const_cast<Nym*>(&theNym);
 
-    if (strName.Exists()) (const_cast<Nym&>(theNym)).SetNymName(strName);
+    if (!strName.empty()) (const_cast<Nym&>(theNym)).SetAlias(strName);
 }
 
 void OTWallet::AddAccount(const Account& theAcct)
@@ -668,114 +497,6 @@ Account* OTWallet::GetIssuerAccount(const Identifier& theInstrumentDefinitionID)
     }
 
     return nullptr;
-}
-
-// Pass in the Notary ID and get the pointer back.
-ServerContract* OTWallet::GetServerContract(const Identifier& NOTARY_ID)
-{
-    for (auto& it : m_mapServers) {
-        ServerContract* pServer = it.second;
-        OT_ASSERT_MSG((nullptr != pServer), "nullptr server pointer in "
-                                            "OTWallet::m_mapServers, "
-                                            "OTWallet::GetServerContract");
-
-        Identifier id_CurrentContract(pServer->ID());
-
-        if (id_CurrentContract == NOTARY_ID)
-            return dynamic_cast<ServerContract*>(pServer);
-    }
-
-    return nullptr;
-}
-
-ServerContract* OTWallet::GetServerContractPartialMatch(
-    std::string PARTIAL_ID)
-{
-    for (auto& it : m_mapServers) {
-        ServerContract* pServer = it.second;
-        OT_ASSERT_MSG((nullptr != pServer), "nullptr server pointer in "
-                                            "OTWallet::m_mapServers, "
-                                            "OTWallet::GetServerContract");
-
-        Identifier id_CurrentContract = pServer->ID();
-
-        String strTemp(id_CurrentContract);
-        std::string strIdentifier = strTemp.Get();
-
-        if (strIdentifier.compare(0, PARTIAL_ID.length(), PARTIAL_ID) == 0)
-            return dynamic_cast<ServerContract*>(pServer);
-    }
-
-    // Okay, let's try it by the name, then.
-    //
-    for (auto& it : m_mapServers) {
-        ServerContract* pServer = it.second;
-        OT_ASSERT_MSG((nullptr != pServer), "nullptr server pointer in "
-                                            "OTWallet::m_mapServers, "
-                                            "OTWallet::GetServerContract");
-
-        std::string str_Name = pServer->Name().Get();
-
-        if (str_Name.compare(0, PARTIAL_ID.length(), PARTIAL_ID) == 0)
-            return dynamic_cast<ServerContract*>(pServer);
-    }
-
-    return nullptr;
-}
-
-// The wallet "owns" theContract and will handle cleaning it up.
-// So make SURE you allocate it on the heap.
-void OTWallet::AddServerContract(ServerContract* theContract)
-{
-    OT_ASSERT(nullptr != theContract);
-
-    Identifier CONTRACT_ID(theContract->ID());
-    String STR_CONTRACT_ID(CONTRACT_ID);
-
-    ServerContract* pContract = GetServerContract(CONTRACT_ID);
-
-    if (pContract) {
-        otErr << "Error: Attempt to add Server Contract but it is already in "
-                 "the wallet.\n";
-
-        delete &theContract; // I have to do this, since the return value is
-                             // void, the caller MUST assume I took ownership.
-    }
-    else {
-        m_mapServers[STR_CONTRACT_ID.Get()] = theContract;
-
-        otInfo << "Saving server contract to disk...\n";
-        App::Me().DB().Store(theContract->Contract());
-
-        SaveWallet();
-    }
-}
-
-// The wallet "owns" theContract and will handle cleaning it up.
-// So make SURE you allocate it on the heap.
-void OTWallet::AddAssetContract(const AssetContract& theContract)
-{
-    Identifier CONTRACT_ID(theContract);
-    String STR_CONTRACT_ID(CONTRACT_ID);
-
-    AssetContract* pContract = GetAssetContract(CONTRACT_ID);
-
-    if (pContract) {
-        otErr << "Error: Attempt to add Asset Contract but it is already in "
-                 "the wallet.\n";
-
-        delete &theContract; // I have to do this, since the return value is
-                             // void, the caller MUST assume I took ownership.
-    }
-    else {
-        m_mapContracts[STR_CONTRACT_ID.Get()] =
-            &(const_cast<AssetContract&>(theContract));
-
-        otInfo << "Saving asset contract to disk...\n";
-        (const_cast<AssetContract&>(theContract)).SaveToContractFolder();
-
-        SaveWallet();
-    }
 }
 
 bool OTWallet::VerifyAssetAccount(const Nym& theNym, Account& theAcct,
@@ -907,68 +628,6 @@ Account* OTWallet::LoadAccount(const Nym& theNym, const Identifier& ACCT_ID,
     return pAccount;
 }
 
-// This function only tries to load as a public Nym.
-// (Though it may return a private one, if one is already loaded.)
-// No need to cleanup, since it adds the Nym to the wallet.
-//
-Nym* OTWallet::GetOrLoadPublicNym(const Identifier& NYM_ID,
-                                  const char* szFuncName,
-                                  bool bChecking/*=false*/)
-{
-    const char* szFunc = "OTWallet::GetOrLoadPublicNym";
-    szFuncName = (szFuncName == nullptr) ? "" : szFuncName;
-
-    if (NYM_ID.IsEmpty()) {
-        otErr << __FUNCTION__ << ":" << szFuncName
-        << ": Error: NYM_ID passed in empty, returning null";
-        return nullptr;
-    }
-    const String strNymID(NYM_ID);
-    String strNymName;
-
-    Nym* pNym = GetPublicNymByID(NYM_ID);
-    if (nullptr != pNym) // Found it.
-    {
-//      RemovePrivateNym(NYM_ID, false); // May add this later. Maybe not necessary.
-        
-        if (pNym->HasPublicKey())
-        {
-            return pNym;
-        }
-        else
-        {
-            RemovePublicNym(NYM_ID, &strNymName);
-            pNym = nullptr;
-        }
-    }
-
-    pNym = GetPrivateNymByID(NYM_ID);
-    // Wasn't already in the wallet. Try loading it.
-    if (nullptr == pNym) {
-        if (!bChecking)
-            otWarn << szFunc << " " << szFuncName
-                 << ": There's no Nym already loaded with that ID. "
-                 "Attempting to load public key...\n";
-        pNym = Nym::LoadPublicNym(NYM_ID, &strNymName, szFuncName, bChecking);
-        if (nullptr != pNym) {
-            AddNym(*pNym);
-        }
-        else if (!bChecking)
-            otOut << szFunc << " " << szFuncName
-                  << ": Unable to load public Nym for: " << strNymID << " \n";
-    }
-
-    // If pNym exists, yet he doesn't have a public key (weird!)
-    // Though we log the error, we still return pNym, since it exists.
-    //
-    if ((nullptr != pNym) && !pNym->HasPublicKey())
-        otErr << szFunc << " " << szFuncName << ": Found nym (" << strNymID
-              << "), but he has no public key. "
-                 "(Still returning the Nym, since it exists.)\n";
-    return pNym;
-}
-    
-    
 // This function only tries to load as a private Nym.
 // No need to cleanup, since it adds the Nym to the wallet.
 //
@@ -993,9 +652,6 @@ Nym* OTWallet::GetOrLoadPrivateNym(const Identifier& NYM_ID, bool bChecking,
     if (nullptr == pPWData) pPWData = &thePWData;
 
     szFuncName = (szFuncName == nullptr) ? "" : szFuncName;
-    
-    // Remove from public if the nym is there
-    RemovePublicNym(NYM_ID, &strNymName);
 
     // See if it's already there. (Could be the public version
     // though :P Still might have to reload it.)
@@ -1021,163 +677,10 @@ Nym* OTWallet::GetOrLoadPrivateNym(const Identifier& NYM_ID, bool bChecking,
         return nullptr;
     }
 
-    AddNym(*pNym);
+    AddPrivateNym(*pNym);
     return pNym;
 }
 
-// This function tries to load as public Nym first, then if it fails,
-// it tries the private one next. (So as to avoid unnecessarily asking
-// users for their passphrase.) Be sure to use GetOrLoadPublicNym() or
-// GetOrLoadPrivateNym() if you want to force it one way or the other.
-//
-// No need to cleanup, since either function called will add the loaded
-// Nym to the wallet, which will take ownership.
-//
-Nym* OTWallet::GetOrLoadNym(const Identifier& NYM_ID, bool bChecking,
-                            const char* szFuncName,
-                            const OTPasswordData* pPWData)
-{
-    if (NYM_ID.IsEmpty()) {
-        otErr << __FUNCTION__ << ":" << szFuncName
-        << ": Error: NYM_ID passed in empty, returning null";
-        return nullptr;
-    }
-
-    Nym* pNym = GetPrivateNymByID(NYM_ID);
-
-    if (nullptr == pNym)
-        pNym = GetOrLoadPublicNym(NYM_ID, szFuncName, true);
-
-    // It tries to load as public Nym first, so as not to force the user to
-    // enter his passphrase unnecessarily.
-    // However, if this fails, then it tries the private one, just to see
-    // if it can be found.
-    //
-    OTPasswordData thePWData(OT_PW_DISPLAY);
-
-    if (nullptr == pNym)
-        pNym = GetOrLoadPrivateNym(NYM_ID, bChecking, szFuncName,
-                                   nullptr == pPWData ? &thePWData : pPWData);
-
-    return pNym;
-}
-
-Nym* OTWallet::reloadAndGetNym(const Identifier& NYM_ID, bool bChecking/*=false*/,
-                               const char* szFuncName /*=nullptr*/,
-                               const OTPasswordData* pPWData /*=nullptr*/)
-{
-    if (NYM_ID.IsEmpty()) {
-        otErr << __FUNCTION__ << ":" << szFuncName
-        << ": Error: NYM_ID passed in empty, returning null";
-        return nullptr;
-    }
-    // --------------------------------------------
-    String strFirstName, strSecondName, strNymName;
-    
-    const bool bPublicNymAlreadyLoaded  = RemovePublicNym (NYM_ID, &strFirstName);
-    const bool bPrivateNymAlreadyLoaded = RemovePrivateNym(NYM_ID, false, &strSecondName);
-    // (False so it doesn't remove it from cached key list.)
-    
-    if (strFirstName.Exists())
-        strNymName = strFirstName;
-    else if (strSecondName.Exists())
-        strNymName = strSecondName;
-    // --------------------------------------------
-    Nym* pNym = nullptr;
-    OTPasswordData thePWData(OT_PW_DISPLAY);
-    if (nullptr == pPWData) pPWData = &thePWData;
-
-    // If the public Nym had been the one loaded before, then we try it first.
-    if (bPublicNymAlreadyLoaded)
-    {
-        pNym = Nym::LoadPublicNym(NYM_ID, &strNymName, szFuncName, bChecking);
-    }
-    // --------------------------------------------
-    else if (bPrivateNymAlreadyLoaded)
-    {
-        pNym = Nym::LoadPrivateNym(NYM_ID, bChecking, &strNymName,
-                                   szFuncName,
-                                   pPWData);
-    }
-    // --------------------------------------------
-    // NOTE: Maybe it wasn't loaded AT ALL before!
-    // In that case, it was most likely a public Nym,
-    // since the private ones load when the wallet loads.
-    // So we'll try public first:
-    //
-    if (nullptr == pNym)
-        pNym = Nym::LoadPublicNym(NYM_ID, &strNymName, szFuncName, bChecking);
-
-    // Then we try private, last of all (since it may incur an "enter passphrase",
-    // which we should avoid whenever possible.)
-    //
-    if (nullptr == pNym)
-        pNym = Nym::LoadPrivateNym(NYM_ID, bChecking, &strNymName,
-                                   szFuncName,
-                                   pPWData);
-    // --------------------------------------------
-    // STILL NULL BY THIS POINT??? failure.
-    //
-    if (nullptr == pNym)
-    {
-        if (!bChecking)
-        {
-            const String strNymID(NYM_ID);
-            otOut << __FUNCTION__ << " " << szFuncName
-                  << ": Unable to load public or private Nym for: " << strNymID << " \n";
-        }
-        
-        return nullptr;
-    }
-    // --------------------------------------------
-    AddNym(*pNym);
-    
-    return pNym;
-}
-    
-Nym* OTWallet::reloadAndGetPublicNym(const Identifier& NYM_ID,
-                                     const char* szFuncName /*=nullptr*/,
-                                     bool bChecking/*=false*/)
-{
-    const char* szFunc = "OTWallet::reloadAndGetPublicNym";
-    szFuncName = (szFuncName == nullptr) ? "" : szFuncName;
-    
-    if (NYM_ID.IsEmpty()) {
-        otErr << __FUNCTION__ << ":" << szFuncName
-        << ": Error: NYM_ID passed in empty, returning null";
-        return nullptr;
-    }
-    const String strNymID(NYM_ID);
-    String strNymName, strFirstName, strSecondName;
-    // --------------------------------------------
-    // Unload if the nym is already loaded.
-    RemovePublicNym (NYM_ID, &strFirstName);
-    RemovePrivateNym(NYM_ID, false, &strSecondName);
-    // False so it doesn't remove it from cached key list.
-    
-    if (strFirstName.Exists())
-        strNymName = strFirstName;
-    else if (strSecondName.Exists())
-        strNymName = strSecondName;
-    // --------------------------------------------
-    Nym* pNym = Nym::LoadPublicNym(NYM_ID, &strNymName, szFuncName, bChecking);
-    if (nullptr != pNym) {
-        AddNym(*pNym);
-    }
-    else if (!bChecking)
-        otOut << szFunc << " " << szFuncName
-              << ": Unable to load public Nym for: " << strNymID << " \n";
-    
-    // If pNym exists, yet he doesn't have a public key (weird!)
-    // Though we log the error, we still return pNym, since it exists.
-    //
-    if ((nullptr != pNym) && !pNym->HasPublicKey())
-        otErr << szFunc << " " << szFuncName << ": Loaded public nym (" << strNymID
-        << "), but he has no public key. "
-        "(Still returning the Nym, since it exists.)\n";
-    return pNym;
-}
-    
 Nym* OTWallet::reloadAndGetPrivateNym(const Identifier& NYM_ID, bool bChecking/*=false*/,
                                       const char* szFuncName /*=nullptr*/,
                                       const OTPasswordData* pPWData /*=nullptr*/,
@@ -1198,9 +701,7 @@ Nym* OTWallet::reloadAndGetPrivateNym(const Identifier& NYM_ID, bool bChecking/*
     // --------------------------------------------
     // Unload if the nym is already loaded.
     RemovePrivateNym(NYM_ID, false, &strFirstName);
-    // False so it doesn't remove it from cached key list.
-    RemovePublicNym (NYM_ID, &strSecondName);
-    
+
     if (strFirstName.Exists())
         strNymName = strFirstName;
     else if (strSecondName.Exists())
@@ -1221,7 +722,7 @@ Nym* OTWallet::reloadAndGetPrivateNym(const Identifier& NYM_ID, bool bChecking/*
         return nullptr;
     }
 
-    AddNym(*pNym);
+    AddPrivateNym(*pNym);
     return pNym;
 }
 
@@ -1241,15 +742,6 @@ bool OTWallet::RemovePrivateNym(const Identifier& theTargetID,
                      pStrOutputName);
 }
 
-// higher level version of this will require a server message, in addition to
-// removing from wallet.
-    bool OTWallet::RemovePublicNym(const Identifier& theTargetID,
-                                   String * pStrOutputName/*=nullptr*/)
-{
-    return RemoveNym(theTargetID, m_mapPublicNyms,  false,
-                     pStrOutputName);
-}
-
 bool OTWallet::RemoveNym(const Identifier& theTargetID, mapOfNyms& map,
                          bool bRemoveFromCachedKey/*=true*/,
                          String * pStrOutputName/*=nullptr*/)
@@ -1260,10 +752,10 @@ bool OTWallet::RemoveNym(const Identifier& theTargetID, mapOfNyms& map,
                       "nullptr pseudonym pointer in OTWallet::RemoveNym.");
 
         if (pNym->CompareID(theTargetID)) {
-            
+
             if (nullptr != pStrOutputName)
-                *pStrOutputName = pNym->GetNymName();
-            
+                *pStrOutputName = pNym->Alias();
+
             // We have a set of NymIDs for Nyms in the wallet who are using the
             // Master key.
             // So if we're removing the Nym from the wallet, we also remove its
@@ -1284,54 +776,6 @@ bool OTWallet::RemoveNym(const Identifier& theTargetID, mapOfNyms& map,
             return true;
         }
     }
-    return false;
-}
-
-bool OTWallet::RemoveAssetContract(const Identifier& theTargetID)
-{
-    // loop through the items that make up this transaction and print them out
-    // here, base64-encoded, of course.
-    Identifier aContractID;
-
-    for (auto it(m_mapContracts.begin()); it != m_mapContracts.end(); ++it) {
-        AssetContract* pContract = it->second;
-        OT_ASSERT(nullptr != pContract);
-
-        pContract->GetIdentifier(aContractID);
-
-        if (aContractID == theTargetID) {
-            m_mapContracts.erase(it);
-
-            delete pContract;
-
-            return true;
-        }
-    }
-
-    return false;
-}
-
-bool OTWallet::RemoveServerContract(const Identifier& theTargetID)
-{
-    for (auto it(m_mapServers.begin()); it != m_mapServers.end(); ++it) {
-        ServerContract* pServer = it->second;
-        OT_ASSERT_MSG((nullptr != pServer), "nullptr server pointer in "
-                                            "OTWallet::m_mapServers, "
-                                            "OTWallet::RemoveServerContract");
-
-        Identifier id_CurrentContract = pServer->ID();
-
-        if (id_CurrentContract == theTargetID) {
-            m_mapServers.erase(it);
-
-            ServerContract* pServerContract =
-                static_cast<ServerContract*>(pServer);
-            delete pServerContract;
-
-            return true;
-        }
-    }
-
     return false;
 }
 
@@ -1356,55 +800,6 @@ bool OTWallet::RemoveAccount(const Identifier& theTargetID)
     }
 
     return false;
-}
-
-AssetContract* OTWallet::GetAssetContract(const Identifier& theContractID)
-{
-    for (auto& it : m_mapContracts) {
-        AssetContract* pContract = it.second;
-        OT_ASSERT(nullptr != pContract);
-
-        Identifier aContractID;
-        pContract->GetIdentifier(aContractID);
-
-        if (aContractID == theContractID) return pContract;
-    }
-
-    return nullptr;
-}
-
-AssetContract* OTWallet::GetAssetContractPartialMatch(
-    std::string PARTIAL_ID) // works with name, too.
-{
-    for (auto& it : m_mapContracts) {
-        AssetContract* pContract = it.second;
-        OT_ASSERT(nullptr != pContract);
-
-        Identifier aContractID;
-        pContract->GetIdentifier(aContractID);
-
-        String strTemp(aContractID);
-        std::string strIdentifier = strTemp.Get();
-
-        if (strIdentifier.compare(0, PARTIAL_ID.length(), PARTIAL_ID) == 0)
-            return pContract;
-    }
-
-    // Okay, let's try it by the name, then...
-    //
-    for (auto& it : m_mapContracts) {
-        AssetContract* pContract = it.second;
-        OT_ASSERT(nullptr != pContract);
-
-        String strName;
-        pContract->GetName(strName);
-        std::string str_Name = strName.Get();
-
-        if (str_Name.compare(0, PARTIAL_ID.length(), PARTIAL_ID) == 0)
-            return pContract;
-    }
-
-    return nullptr;
 }
 
 bool OTWallet::SaveContract(String& strContract)
@@ -1487,31 +882,6 @@ bool OTWallet::SaveContract(String& strContract)
                                        "OTWallet::SaveContract");
 
         pNym->SavePseudonymWallet(tag);
-    }
-
-    for (auto& it : m_mapContracts) {
-        Contract* pContract = it.second;
-        OT_ASSERT_MSG(nullptr != pContract, "nullptr contract pointer in "
-                                            "OTWallet::m_mapContracts, "
-                                            "OTWallet::SaveContract");
-
-        pContract->SaveContractWallet(tag);
-    }
-
-    for (auto& it : m_mapServers) {
-        ServerContract* pServer = it.second;
-        OT_ASSERT_MSG(nullptr != pServer, "nullptr server pointer in "
-                                          "OTWallet::m_mapServers, "
-                                          "OTWallet::SaveContract");
-
-        TagPtr pTag(new Tag("notaryProvider"));
-        
-        OTASCIIArmor ascServerName;
-        if (pServer->Name().Exists())
-            ascServerName.SetString(pServer->Name(), false);
-        pTag->add_attribute("name", ascServerName.Get());
-        pTag->add_attribute("notaryID", pServer->ID().Get());
-        tag.add_tag(pTag);
     }
 
     for (auto& it : m_mapAccounts) {
@@ -2013,16 +1383,12 @@ bool OTWallet::LoadWallet(const char* szFilename)
                     }
 
                     Nym* pNym = Nym::LoadPrivateNym(theNymID, false, &NymName);
-                    // If it fails loading as a private Nym, then maybe it's a
-                    // public one...
-                    if (nullptr == pNym)
-                        pNym = Nym::LoadPublicNym(theNymID, &NymName);
 
-                    if (nullptr == pNym) // STILL null ??
+                    if (nullptr == pNym)
                         otOut << __FUNCTION__ << ": Failed loading Nym ("
                               << NymName << ") with ID: " << NymID << "\n";
                     else
-                        AddNym(*pNym); // Nym loaded. Insert to wallet's
+                        AddPrivateNym(*pNym); // Nym loaded. Insert to wallet's
                                        // list of Nyms.
 
                     if (bIsOldStyleNym && OTCachedKey::It()->isPaused()) {
@@ -2032,107 +1398,6 @@ bool OTWallet::LoadWallet(const char* szFilename)
                     // still load properly, when they come around.)
                 }
 
-                // NOTE: It's only by THIS point (assetType) that we KNOW we
-                // loaded all the Nyms.
-                // If we are version 1.0, NOW we should convert them all to the
-                // new master key!!
-                else if (strNodeName.Compare("assetType")) {
-
-                    OTASCIIArmor ascAssetName = xml->getAttributeValue("name");
-
-                    if (ascAssetName.Exists())
-                        ascAssetName.GetString(AssetName,
-                                               false); // linebreaks == false
-
-                    //                    AssetName        =
-                    // xml->getAttributeValue("name");
-                    InstrumentDefinitionID = xml->getAttributeValue(
-                        "instrumentDefinitionID"); // hash of contract itself
-
-                    otInfo << "\n\n****Asset Contract**** (wallet listing)\n  "
-                              "Asset Name: " << AssetName
-                           << "\n Contract ID: " << InstrumentDefinitionID
-                           << "\n";
-
-                    String strContractPath(OTFolders::Contract());
-                    AssetContract* pContract = new AssetContract(
-                        AssetName, strContractPath, InstrumentDefinitionID,
-                        InstrumentDefinitionID);
-
-                    OT_ASSERT_MSG(nullptr != pContract,
-                                  "Error allocating memory "
-                                  "for Asset Contract in "
-                                  "OTWallet::LoadWallet\n");
-
-                    if (pContract->LoadContract()) {
-                        if (pContract->VerifyContract()) {
-                            otWarn << "** Asset Contract Verified "
-                                      "**\n------------------------------------"
-                                      "----------------------------------------"
-                                      "-\n\n";
-
-                            pContract->SetName(AssetName);
-
-                            m_mapContracts[InstrumentDefinitionID.Get()] =
-                                pContract;
-                        }
-                        else {
-                            delete pContract;
-                            pContract = nullptr;
-                            otOut << "Contract FAILED to verify.\n";
-                        }
-                    }
-                    else {
-                        delete pContract;
-                        pContract = nullptr;
-                        otErr << __FUNCTION__
-                              << ": Error reading file for Asset Contract.\n";
-                    }
-
-                }
-                else if (strNodeName.Compare("notaryProvider")) {
-                    OTASCIIArmor ascServerName = xml->getAttributeValue("name");
-
-                    if (ascServerName.Exists())
-                        ascServerName.GetString(ServerName,
-                                                false); // linebreaks == false
-
-                    NotaryID =
-                        xml->getAttributeValue("notaryID"); // hash of contract
-
-                    otInfo << "\n\n\n****Server Contract**** (wallet "
-                              "listing):\n Server Name: " << ServerName
-                           << "\n   Notary ID: " << NotaryID << "\n";
-
-                    std::shared_ptr<proto::ServerContract> proto;
-                    App::Me().DB().Load(NotaryID.Get(), proto);
-
-                    std::unique_ptr<ServerContract>
-                        pContract(ServerContract::Factory(*proto));
-
-                    OT_ASSERT_MSG(pContract,
-                                  "Error allocating memory "
-                                  "for Server Contract in "
-                                  "OTWallet::LoadWallet\n");
-
-                    if (pContract) {
-                        pContract->SetName(ServerName);
-                        otWarn << "** Server Contract Verified "
-                                    "**\n------------------------------------"
-                                    "----------------------------------------"
-                                    "-\n\n";
-                        // Uncomment : Move these lines back above the 'if'
-                        // block to regenerate some newly-signed contracts.
-                        // (for testing only.) Otherwise leave here where it
-                        // belongs.
-                        m_mapServers[NotaryID.Get()] = pContract.release();
-                    }
-                    else {
-                        otErr
-                            << __FUNCTION__
-                            << ": Error reading file for Transaction Server.\n";
-                    }
-                }
                 else if (strNodeName.Compare("account")) {
                     OTASCIIArmor ascAcctName = xml->getAttributeValue("name");
 
@@ -2187,19 +1452,6 @@ bool OTWallet::LoadWallet(const char* szFilename)
         // loaded.
 
         for (auto& it : m_mapPrivateNyms) {
-            Nym* pNym = it.second;
-            OT_ASSERT_MSG(
-                (nullptr != pNym),
-                "ASSERT: OTWallet::LoadWallet: nullptr pseudonym pointer.");
-
-            if (pNym->HasPrivateKey() &&
-                ConvertNymToCachedKey(*pNym)) // Internally this is smart
-                                              // enough to only convert
-                                              // the unconverted.
-                bNeedToSaveAgain = true;
-        }
-
-        for (auto& it : m_mapPublicNyms) {
             Nym* pNym = it.second;
             OT_ASSERT_MSG(
                 (nullptr != pNym),

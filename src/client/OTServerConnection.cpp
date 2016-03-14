@@ -212,7 +212,7 @@ bool OTServerConnection::GetNotaryID(Identifier& theID) const
     return false;
 }
 
-void OTServerConnection::send(ServerContract* pServerContract, Nym* pNym,
+void OTServerConnection::send(const ServerContract* pServerContract, Nym* pNym,
                               const Message& theMessage)
 {
     OT_ASSERT(nullptr != pServerContract);

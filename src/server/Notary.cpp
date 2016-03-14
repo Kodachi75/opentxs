@@ -45,12 +45,14 @@
 #include <opentxs/cash/Mint.hpp>
 #include <opentxs/cash/Purse.hpp>
 #include <opentxs/cash/Token.hpp>
-#include <opentxs/basket/BasketItem.hpp>
-#include <opentxs/basket/Basket.hpp>
+#include "opentxs/core/app/App.hpp"
+#include <opentxs/core/contract/basket/BasketItem.hpp>
+#include <opentxs/core/contract/basket/Basket.hpp>
+#include <opentxs/core/contract/basket/BasketContract.hpp>
 #include <opentxs/core/script/OTSmartContract.hpp>
 #include <opentxs/core/recurring/OTPaymentPlan.hpp>
 #include <opentxs/core/crypto/OTNymOrSymmetricKey.hpp>
-#include <opentxs/core/AssetContract.hpp>
+#include "opentxs/core/contract/UnitDefinition.hpp"
 #include <opentxs/core/Cheque.hpp>
 #include <opentxs/core/Ledger.hpp>
 #include <opentxs/core/Account.hpp>
@@ -1563,31 +1565,39 @@ void Notary::NotarizePayDividend(Nym& theNym, Account& theSourceAccount,
             //
             const Identifier SHARES_INSTRUMENT_DEFINITION_ID =
                 theVoucherRequest.GetInstrumentDefinitionID();
-            AssetContract* pSharesContract =
-                server_->transactor_.getAssetContract(
-                    SHARES_INSTRUMENT_DEFINITION_ID);
+            auto pSharesContract = App::Me().Contract().UnitDefinition(
+                theVoucherRequest.GetInstrumentDefinitionID());
             Account* pSharesIssuerAccount = nullptr;
             std::unique_ptr<Account> theAcctAngel;
 
-            if (nullptr != pSharesContract) {
+            if (pSharesContract) {
                 pSharesIssuerAccount = Account::LoadExistingAccount(
                     SHARES_ISSUER_ACCT_ID, NOTARY_ID);
                 theAcctAngel.reset(pSharesIssuerAccount);
             }
 
-            if (nullptr == pSharesContract) {
+            Identifier purportedID;
+            theNym.GetIdentifier(purportedID);
+
+            if (!pSharesContract) {
                 const String strSharesType(SHARES_INSTRUMENT_DEFINITION_ID);
                 Log::vError("%s: ERROR unable to find shares contract based "
                             "on instrument definition ID: %s\n",
                             szFunc, strSharesType.Get());
             }
-            else if (!pSharesContract->IsShares()) {
+            else if (pSharesContract->Type() != proto::UNITTYPE_SECURITY) {
                 const String strSharesType(SHARES_INSTRUMENT_DEFINITION_ID);
                 Log::vError("%s: FAILURE: Asset contract is not "
                             "shares-based. Asset type ID: %s\n",
                             szFunc, strSharesType.Get());
             }
-            else if (!pSharesContract->VerifySignature(theNym)) {
+            else if (!(String(purportedID) == String(pSharesContract->Nym()->ID()))) {
+                const String strSharesType(SHARES_INSTRUMENT_DEFINITION_ID);
+                Log::vError("%s: ERROR only the issuer (%s) of contract "
+                " (%s) may pay dividends.\n",
+                szFunc, strNymID.Get(), strSharesType.Get());
+            }
+            else if (!pSharesContract->Validate()) {
                 const String strSharesType(SHARES_INSTRUMENT_DEFINITION_ID);
                 Log::vError("%s: ERROR unable to verify signature for Nym "
                             "(%s) on shares contract "
@@ -4131,7 +4141,7 @@ void Notary::NotarizePaymentPlan(Nym& theNym, Account& theDepositorAccount,
                 const bool bCancelling = (pPlan->IsCanceled() && pPlan->GetCancelerID(theCancelerNymID));
                 const int64_t lExpectedNum = bCancelling ? 0 : pItem->GetTransactionNum();
                 const int64_t lFoundNum = pPlan->GetTransactionNum();
-                
+
                 const Identifier& FOUND_NYM_ID =
                     bCancelling ? pPlan->GetRecipientNymID()
                                 : pPlan->GetSenderNymID();
@@ -4221,7 +4231,7 @@ void Notary::NotarizePaymentPlan(Nym& theNym, Account& theDepositorAccount,
                     Nym theRecipientNym; // We'll probably use this, but maybe not. So I use a pointer
                                          // that will maybe point here.
                     Nym* pRecipientNym = nullptr; // Here's the pointer. (Logic explained directly below.)
-                    
+
                     // Set pRecipientNym to point to the right one so we can use it below.
                     // (Do NOT use theRecipientNym, since it won't always point to that one.)
 
@@ -4365,7 +4375,7 @@ void Notary::NotarizePaymentPlan(Nym& theNym, Account& theDepositorAccount,
                             //
                             Account * pRecipientAcct = nullptr;
                             std::unique_ptr<Account> theRecipientAcctGuardian;
-                            
+
                             if (!bCancelling) // ACTIVATING
                             {
                                 pRecipientAcct = Account::LoadExistingAccount(
@@ -5632,7 +5642,7 @@ void Notary::NotarizeExchangeBasket(Nym& theNym, Account& theAccount,
 
             // Here's the request from the user.
             String strBasket;
-            Basket theBasket, theRequestBasket;
+            Basket theRequestBasket;
 
             pItem->GetAttachment(strBasket);
 
@@ -5696,19 +5706,23 @@ void Notary::NotarizeExchangeBasket(Nym& theNym, Account& theAccount,
                 }
                 else {
                     // Now we get a pointer to its asset contract...
-                    AssetContract* pContract =
-                        server_->transactor_.getAssetContract(
-                            BASKET_CONTRACT_ID);
+                    auto pContract =
+                        App::Me().Contract().UnitDefinition(BASKET_CONTRACT_ID);
+
+                    const BasketContract* basket = nullptr;
+
+                    if (pContract) {
+                        basket = dynamic_cast<const BasketContract*>
+                            (pContract.get());
+                    }
 
                     // Now let's load up the actual basket, from the actual
                     // asset contract.
-                    if (pContract &&
-                        theBasket.LoadContractFromString(
-                            pContract->GetBasketInfo()) &&
-                        theBasket.VerifySignature(server_->m_nymServer) &&
-                        theBasket.Count() == theRequestBasket.Count() &&
-                        theBasket.GetMinimumTransfer() ==
-                            theRequestBasket.GetMinimumTransfer()) {
+                    int64_t currencies = basket->Currencies().size();
+                    int64_t weight = basket->Weight();
+                    if ((nullptr != basket) &&
+                        currencies == theRequestBasket.Count() &&
+                        weight == theRequestBasket.GetMinimumTransfer()) {
                         // Let's make sure that the same asset account doesn't
                         // appear twice on the request.
                         //
@@ -5741,37 +5755,40 @@ void Notary::NotarizeExchangeBasket(Nym& theNym, Account& theAccount,
                         {
                             // Loop through the request AND the actual basket
                             // TOGETHER...
-                            for (int32_t i = 0; i < theBasket.Count(); i++) {
-                                BasketItem* pBasketItem = theBasket.At(i);
-                                BasketItem* pRequestItem =
-                                    theRequestBasket.At(i); // we already know
-                                                            // these are the
-                                                            // same length
+                            for (int32_t i = 0; i < theRequestBasket.Count(); i++) {
 
-                                // if not equal
-                                if (!(pBasketItem->SUB_CONTRACT_ID ==
-                                      pRequestItem->SUB_CONTRACT_ID)) {
-                                    Log::Error(
-                                        "Error: expected instrument definition "
-                                        "IDs to match in "
-                                        "Notary::"
-                                        "NotarizeExchangeBasket\n");
-                                    bSuccess = false;
-                                    break;
+                                BasketItem* pRequestItem =
+                                    theRequestBasket.At(i);
+                                const String requestContractID(
+                                    pRequestItem->SUB_CONTRACT_ID);
+                                const String requestAccountID(
+                                    pRequestItem->SUB_ACCOUNT_ID);
+
+                                if (basket->Currencies().find(
+                                    requestContractID.Get()) ==
+                                        basket->Currencies().end() ) {
+                                        Log::Error(
+                                            "Error: expected instrument definition "
+                                            "IDs to match in "
+                                            "Notary::"
+                                            "NotarizeExchangeBasket\n");
+                                        bSuccess = false;
+                                        break;
                                 }
-                                // if accounts are equal (should never happen --
-                                // why would the user be trying to use the
-                                // server's account as his own?)
-                                // Furthermore, loading both at the same time,
-                                // with same ID, then saving again, can screw up
-                                // the balance.
-                                //
-                                else if (pBasketItem->SUB_ACCOUNT_ID ==
-                                         pRequestItem->SUB_ACCOUNT_ID) {
+
+                                const String serverAccountID =
+                                    basket->Currencies().at(
+                                        requestContractID.Get()).first;
+
+                                const uint64_t weight =
+                                basket->Currencies().at(
+                                    requestContractID.Get()).second;
+
+                                if (serverAccountID == requestAccountID) {
                                     Log::Error("Error: VERY strange to have "
-                                               "these account ID's match. "
-                                               "Notary::"
-                                               "NotarizeExchangeBasket.\n");
+                                            "these account ID's match. "
+                                            "Notary::"
+                                            "NotarizeExchangeBasket.\n");
                                     bSuccess = false;
                                     break;
                                 }
@@ -5810,7 +5827,7 @@ void Notary::NotarizeExchangeBasket(Nym& theNym, Account& theAccount,
                                     }
                                     Account* pServerAcct =
                                         Account::LoadExistingAccount(
-                                            pBasketItem->SUB_ACCOUNT_ID,
+                                            serverAccountID,
                                             NOTARY_ID);
 
                                     if (nullptr == pServerAcct) {
@@ -5855,7 +5872,7 @@ void Notary::NotarizeExchangeBasket(Nym& theNym, Account& theAccount,
                                     // LoadExistingAccount().
                                     if (pUserAcct
                                             ->GetInstrumentDefinitionID() !=
-                                        pBasketItem->SUB_CONTRACT_ID) {
+                                            requestContractID) {
                                         Log::Error("ERROR verifying instrument "
                                                    "definition on a "
                                                    "user's account in "
@@ -5891,10 +5908,8 @@ void Notary::NotarizeExchangeBasket(Nym& theNym, Account& theAccount,
                                         // for the sub-account on the basket,
                                         // multiplied by
                                         lTransferAmount =
-                                            (pBasketItem
-                                                 ->lMinimumTransferAmount *
-                                             theRequestBasket
-                                                 .GetTransferMultiple());
+                                            (weight * theRequestBasket
+                                                .GetTransferMultiple());
 
                                         // user is performing exchange IN
                                         if (theRequestBasket

@@ -45,7 +45,6 @@
 #include <opentxs/core/Identifier.hpp>
 #include <opentxs/core/Nym.hpp>
 #include <opentxs/core/String.hpp>
-#include <opentxs/core/AssetContract.hpp>
 #include <opentxs/core/Log.hpp>
 
 namespace opentxs
@@ -59,15 +58,6 @@ Transactor::Transactor(OTServer* server)
 
 Transactor::~Transactor()
 {
-    while (!contractsMap_.empty()) {
-        auto it = contractsMap_.begin();
-        AssetContract* pContract = it->second;
-        OT_ASSERT(nullptr != pContract);
-        contractsMap_.erase(it);
-        delete pContract;
-        pContract = nullptr;
-    }
-
     while (!mintsMap_.empty()) {
         auto it = mintsMap_.begin();
         Mint* pMint = it->second;
@@ -256,61 +246,6 @@ bool Transactor::removeIssuedNumber(Nym& theNym,
                               lTransactionNumber, bSave);
 
     return bRemoved;
-}
-
-/// The server supports various different instrument definitions.
-/// Any user may create a new instrument definition by uploading the asset
-/// contract to the
-/// server.
-/// The server stores the contract in a directory and in its in-memory list of
-/// instrument definitions.
-/// You can call this function to look up any asset contract by ID. If it
-/// returns nullptr,
-/// you can add it yourself by uploading the contract.  But be sure that the
-/// public key
-/// in the contract, used to sign the contract, is also the public key of the
-/// Nym of the
-/// issuer.  They must match.  In the future I may create a special key category
-/// just for
-/// this purpose. Right now I'm using the "contract" key which is already used
-/// to verify
-/// any asset or server contract.
-AssetContract* Transactor::getAssetContract(
-    const Identifier& INSTRUMENT_DEFINITION_ID)
-{
-    for (auto& it : contractsMap_) {
-        AssetContract* pContract = it.second;
-        OT_ASSERT(nullptr != pContract);
-
-        Identifier theContractID;
-        pContract->GetIdentifier(theContractID);
-
-        if (theContractID == INSTRUMENT_DEFINITION_ID) return pContract;
-    }
-
-    return nullptr;
-}
-
-/// OTServer will take ownership of theContract from this point on,
-/// and will be responsible for deleting it. MUST be allocated on the heap.
-bool Transactor::addAssetContract(AssetContract& theContract)
-{
-    AssetContract* pContract = nullptr;
-
-    String STR_CONTRACT_ID;
-    Identifier CONTRACT_ID;
-    theContract.GetIdentifier(STR_CONTRACT_ID);
-    theContract.GetIdentifier(CONTRACT_ID);
-
-    pContract = getAssetContract(CONTRACT_ID);
-
-    // already exists
-    if (nullptr != pContract) // if not null
-        return false;
-
-    contractsMap_[STR_CONTRACT_ID.Get()] = &theContract;
-
-    return true;
 }
 
 // Server stores a map of BASKET_ID to BASKET_ACCOUNT_ID.

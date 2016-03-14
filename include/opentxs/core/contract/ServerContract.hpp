@@ -42,12 +42,13 @@
 #include <list>
 #include <memory>
 #include <tuple>
+#include <string>
 
 #include <czmq.h>
-#include <opentxs-proto/verify/VerifyCredentials.hpp>
+#include <opentxs-proto/verify/VerifyContracts.hpp>
 
-#include <opentxs/core/Nym.hpp>
-#include <opentxs/core/Signable.hpp>
+#include "opentxs/core/Nym.hpp"
+#include "opentxs/core/contract/Signable.hpp"
 
 namespace opentxs
 {
@@ -58,42 +59,44 @@ class String;
 class ServerContract : public Signable
 {
 private:
-    typedef std::pair<String, uint32_t> ListenParam;
+    typedef Signable ot_super;
+    typedef std::pair<std::string, uint32_t> ListenParam;
 
     std::list<ListenParam> listen_params_;
-    std::unique_ptr<Nym> nym_;
+    std::string name_;
     OTData transport_key_;
 
     Identifier GetID() const override;
     proto::ServerContract IDVersion() const;
     proto::ServerContract SigVersion() const;
 
-    ServerContract() = default;
-    ServerContract(const proto::ServerContract& serialized);
+    ServerContract() = delete;
+    ServerContract(const ConstNym& nym);
+    ServerContract(
+        const ConstNym& nym,
+        const proto::ServerContract& serialized);
 
 public:
-    static ServerContract* Create(Nym* nym,  // takes ownership
-                                    const String& url,
-                                    const uint32_t port,
-                                    const String& terms,
-                                    const String& name);
-    static ServerContract* Factory(const proto::ServerContract& serialized);
+    static ServerContract* Create(
+        const ConstNym& nym,
+        const std::string& url,
+        const uint32_t port,
+        const std::string& terms,
+        const std::string& name);
+    static ServerContract* Factory(
+        const ConstNym& nym,
+        const proto::ServerContract& serialized);
 
-    bool ConnectInfo(String& strHostname, uint32_t& nPort) const;
+    bool ConnectInfo(std::string& strHostname, uint32_t& nPort) const;
     const proto::ServerContract Contract() const;
-    const String Name() const {
-        if (nullptr != nym_) { return nym_->GetNymName(); } else { return "";}}
     const proto::ServerContract PublicContract() const;
-    const Nym* PublicNym() const;
     bool Statistics(String& strContents) const;
     const unsigned char* PublicTransportKey() const;
     zcert_t* PrivateTransportKey() const;
 
-    bool Save() const override;
+    std::string Name() const override { return name_; }
     OTData Serialize() const override;
     bool Validate() const override;
-
-    bool SetName(const String& name);
 
     EXPORT ~ServerContract() = default;
 };

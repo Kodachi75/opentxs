@@ -70,28 +70,28 @@ public:
         return m_pNym;
     }
 
-    inline ServerContract* GetServerContract() const
+    inline const ServerContract* GetServerContract() const
     {
         return m_pServerContract;
     }
 
     void OnServerResponseToGetRequestNumber(int64_t lNewRequestNumber) const;
 
-    void send(ServerContract* pServerContract, Nym* pNym,
+    void send(const ServerContract* pServerContract, Nym* pNym,
               const Message& theMessage);
-    
+
     bool resetSocket();
-    
+
     static int getLinger();
     static int getSendTimeout();
     static int getRecvTimeout();
-    
+
     static void setLinger(int nIn);
     static void setSendTimeout(int nIn);
     static void setRecvTimeout(int nIn);
-    
+
     static bool networkFailure();    // This returns s_bNetworkFailure.
-    
+
 private:
     bool send(const String&);
     bool receive(std::string& reply);
@@ -99,11 +99,11 @@ private:
 private:
     zsock_t* socket_zmq;
     Nym* m_pNym;
-    ServerContract* m_pServerContract;
+    ServerContract const * m_pServerContract = nullptr;
     OTClient* m_pClient;
-    
+
     std::string m_endpoint;
-    
+
     static int s_linger;
     static int s_send_timeout;
     static int s_recv_timeout;

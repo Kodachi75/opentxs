@@ -132,7 +132,7 @@ public:
     {
         // We're going to listen on the same port that is listed in our server
         // contract. The hostname of this server, according to its own contract.
-        String hostname;
+        std::string hostname;
         uint32_t port = 0;
         bool connectInfo = server_->GetConnectInfo(hostname, port);
 

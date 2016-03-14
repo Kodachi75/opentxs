@@ -41,8 +41,9 @@
 
 #include <string>
 
-#include <opentxs/core/Contract.hpp>
-#include <opentxs/core/Nym.hpp>
+#include <opentxs-proto/verify/VerifyContracts.hpp>
+
+#include <opentxs/core/Proto.hpp>
 #include <opentxs/network/DhtConfig.hpp>
 #include <opentxs/network/OpenDHT.hpp>
 
@@ -50,7 +51,9 @@ namespace opentxs
 {
 
 class App;
+class Credential;
 class ServerContract;
+class UnitDefinition;
 
 //High level interface to OpenDHT. Supports opentxs types.
 class Dht
@@ -62,7 +65,6 @@ public:
         PUBLIC_NYM = 2
     };
 
-    typedef std::function<void(const ServerContract&)> ServerContractCB;
     typedef std::function<void(const std::string)> NotifyCB;
     typedef std::map<Callback, NotifyCB> CallbackMap;
 
@@ -77,7 +79,7 @@ private:
     OpenDHT* node_ = nullptr;
 #endif
 
-    static Dht& It(DhtConfig& config);
+    static Dht* It(DhtConfig& config);
 
 #ifdef OT_DHT
     static bool ProcessPublicNym(
@@ -85,8 +87,10 @@ private:
         NotifyCB notifyCB);
     static bool ProcessServerContract(
         const OpenDHT::Results& values,
-        NotifyCB notifyCB,
-        ServerContractCB cb);
+        NotifyCB notifyCB);
+    static bool ProcessUnitDefinition(
+        const OpenDHT::Results& values,
+        NotifyCB notifyCB);
 #endif
 
     Dht(DhtConfig& config);
@@ -99,17 +103,12 @@ public:
     EXPORT void Insert(
         const std::string& key,
         const std::string& value);
-    EXPORT void Insert(
-        const std::string& ID,
-        const Contract& contract);
-    EXPORT void Insert(const Nym& nym);
-    EXPORT void Insert(const serializedCredentialIndex& nym);
+    EXPORT void Insert(const proto::CredentialIndex& nym);
     EXPORT void Insert(const proto::ServerContract& contract);
-    EXPORT void GetPublicNym(
-        const std::string& key);
-    EXPORT void GetServerContract(
-        const std::string& key,
-        ServerContractCB cb); //function pointer for OTWallet::AddServerContract
+    EXPORT void Insert(const proto::UnitDefinition& contract);
+    EXPORT void GetPublicNym(const std::string& key);
+    EXPORT void GetServerContract(const std::string& key);
+    EXPORT void GetUnitDefinition(const std::string& key);
     EXPORT void RegisterCallbacks(const CallbackMap& callbacks);
 
     void Cleanup();

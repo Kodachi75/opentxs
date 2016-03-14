@@ -51,8 +51,8 @@ class Identifier;
 class OTServer;
 class String;
 
-// Note: from OTAssetContract.h and .cpp.
-// This is a subclass of AccountVisitor, which is used whenever OTAssetContract
+// Note: from OTUnitDefinition.h and .cpp.
+// This is a subclass of AccountVisitor, which is used whenever OTUnitDefinition
 // needs to
 // loop through all the accounts for a given instrument definition (its own.)
 // This subclass

@@ -115,16 +115,16 @@ bool Settings::Load(const String& strConfigurationFileExactPath)
                              lFilelength)) // we don't have a config file, lets
                                            // create a blank one first.
     {
-        pvt->iniSimple.Reset(); // clean the config.
+        pvt_->iniSimple.Reset(); // clean the config.
 
-        SI_Error rc = pvt->iniSimple.SaveFile(
+        SI_Error rc = pvt_->iniSimple.SaveFile(
             strConfigurationFileExactPath.Get()); // save a new file.
         if (0 > rc) return false;                 // error!
 
-        pvt->iniSimple.Reset(); // clean the config (again).
+        pvt_->iniSimple.Reset(); // clean the config (again).
     }
 
-    SI_Error rc = pvt->iniSimple.LoadFile(strConfigurationFileExactPath.Get());
+    SI_Error rc = pvt_->iniSimple.LoadFile(strConfigurationFileExactPath.Get());
     if (0 > rc)
         return false;
     else
@@ -140,7 +140,7 @@ bool Settings::Save(const String& strConfigurationFileExactPath)
         return false;
     }
 
-    SI_Error rc = pvt->iniSimple.SaveFile(strConfigurationFileExactPath.Get());
+    SI_Error rc = pvt_->iniSimple.SaveFile(strConfigurationFileExactPath.Get());
     if (0 > rc)
         return false;
     else
@@ -177,7 +177,7 @@ bool Settings::LogChange_str(const String& strSection, const String& strKey,
 }
 
 Settings::Settings(const String& strConfigFilePath)
-    : pvt(new SettingsPvt())
+    : pvt_(new SettingsPvt())
     , b_Loaded(false)
     , m_strConfigurationFileExactPath(strConfigFilePath)
 {
@@ -202,7 +202,7 @@ bool Settings::HasConfigFilePath()
 }
 
 Settings::Settings()
-    : pvt(new SettingsPvt())
+    : pvt_(new SettingsPvt())
     , b_Loaded(false)
 {
 }
@@ -237,13 +237,13 @@ const bool& Settings::IsLoaded() const
 bool Settings::Reset()
 {
     b_Loaded = false;
-    pvt->iniSimple.Reset();
+    pvt_->iniSimple.Reset();
     return true;
 }
 
 bool Settings::IsEmpty() const
 {
-    return pvt->iniSimple.IsEmpty();
+    return pvt_->iniSimple.IsEmpty();
 }
 
 bool Settings::Check_str(const String& strSection, const String& strKey,
@@ -276,7 +276,7 @@ bool Settings::Check_str(const String& strSection, const String& strKey,
     }
 
     const char* szVar =
-        pvt->iniSimple.GetValue(strSection.Get(), strKey.Get(), nullptr);
+        pvt_->iniSimple.GetValue(strSection.Get(), strKey.Get(), nullptr);
     String strVar(szVar);
 
     if (strVar.Exists() && !strVar.Compare("")) {
@@ -321,13 +321,13 @@ bool Settings::Check_long(const String& strSection, const String& strKey,
     }
 
     const char* szVar =
-        pvt->iniSimple.GetValue(strSection.Get(), strKey.Get(), nullptr);
+        pvt_->iniSimple.GetValue(strSection.Get(), strKey.Get(), nullptr);
     String strVar(szVar);
 
     if (strVar.Exists() && !strVar.Compare("")) {
         out_bKeyExist = true;
         out_lResult =
-            pvt->iniSimple.GetLongValue(strSection.Get(), strKey.Get(), 0);
+            pvt_->iniSimple.GetLongValue(strSection.Get(), strKey.Get(), 0);
     }
     else {
         out_bKeyExist = false;
@@ -367,7 +367,7 @@ bool Settings::Check_bool(const String& strSection, const String& strKey,
     }
 
     const char* szVar =
-        pvt->iniSimple.GetValue(strSection.Get(), strKey.Get(), nullptr);
+        pvt_->iniSimple.GetValue(strSection.Get(), strKey.Get(), nullptr);
     String strVar(szVar);
 
     if (strVar.Exists() &&
@@ -442,7 +442,7 @@ bool Settings::Set_str(const String& strSection, const String& strKey,
     if (!LogChange_str(strSection, strKey, strValue)) return false;
 
     // Set New Value
-    SI_Error rc = pvt->iniSimple.SetValue(strSection.Get(), strKey.Get(),
+    SI_Error rc = pvt_->iniSimple.SetValue(strSection.Get(), strKey.Get(),
                                           szValue, szComment, true);
     if (0 > rc) return false;
 
@@ -525,7 +525,7 @@ bool Settings::Set_long(const String& strSection, const String& strKey,
     if (!LogChange_str(strSection, strKey, strValue)) return false;
 
     // Set New Value
-    SI_Error rc = pvt->iniSimple.SetLongValue(strSection.Get(), strKey.Get(),
+    SI_Error rc = pvt_->iniSimple.SetLongValue(strSection.Get(), strKey.Get(),
                                               lValue, szComment, false, true);
     if (0 > rc) return false;
 
@@ -587,11 +587,11 @@ bool Settings::CheckSetSection(const String& strSection,
                                                          : nullptr;
 
     const int64_t lSectionSize =
-        pvt->iniSimple.GetSectionSize(strSection.Get());
+        pvt_->iniSimple.GetSectionSize(strSection.Get());
 
     if (1 > lSectionSize) {
         out_bIsNewSection = true;
-        SI_Error rc = pvt->iniSimple.SetValue(strSection.Get(), nullptr,
+        SI_Error rc = pvt_->iniSimple.SetValue(strSection.Get(), nullptr,
                                               nullptr, szComment, false);
         if (0 > rc) return false;
     }

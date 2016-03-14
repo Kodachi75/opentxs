@@ -112,7 +112,7 @@ protected:
     String m_strVersion; // The version of this Contract file, in case the
                          // format changes in the future.
     // todo: perhaps move these to a common ancestor for ServerContract and
-    // OTAssetContract.
+    // OTUnitDefinition.
     // Maybe call it OTHardContract (since it should never change.)
     //
     String m_strEntityShortName;

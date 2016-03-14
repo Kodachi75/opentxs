@@ -9,7 +9,7 @@
  *       -- Untraceable Digital Cash.
  *       -- Triple-Signed Receipts.
  *       -- Cheques, Vouchers, Transfers, Inboxes.
- *       -- Basket Currencies, Markets, Payment Plans.
+ *       -- Currency Currencies, Markets, Payment Plans.
  *       -- Signed, XML, Ricardian-style Contracts.
  *       -- Scripted smart contracts.
  *
@@ -36,44 +36,47 @@
  *
  ************************************************************/
 
-#ifndef OPENTXS_BASKET_BASKETITEM_HPP
-#define OPENTXS_BASKET_BASKETITEM_HPP
+#include <opentxs/core/stdafx.hpp>
 
-#include <opentxs/core/Identifier.hpp>
-
-#include <deque>
+#include <opentxs/core/Nym.hpp>
+#include <opentxs/core/Log.hpp>
+#include <opentxs/core/contract/SecurityContract.hpp>
 
 namespace opentxs
 {
 
-class BasketItem;
-
-typedef std::deque<BasketItem*> dequeOfBasketItems;
-
-class BasketItem
+SecurityContract::SecurityContract(
+    const ConstNym& nym,
+    const proto::UnitDefinition serialized)
+        : ot_super(nym, serialized)
+        , issue_date_(serialized.security().issuedate())
 {
-public:
-    Identifier SUB_CONTRACT_ID;
-    Identifier SUB_ACCOUNT_ID;
+}
 
-    int64_t lMinimumTransferAmount;
+SecurityContract::SecurityContract(
+    const ConstNym& nym,
+    const std::string& shortname,
+    const std::string& name,
+    const std::string& symbol,
+    const std::string& terms,
+    const std::string& date)
+        : ot_super(nym, shortname, name, symbol, terms)
+        , issue_date_(date)
+{
+}
 
-    // lClosingTransactionNo:
-    // Used when EXCHANGING a basket (NOT USED when first creating one.)
-    // A basketReceipt must be dropped into each asset account during
-    // an exchange, to account for the change in balance. Until that
-    // receipt is accepted, lClosingTransactionNo will remain open as
-    // an issued transaction number (an open transaction) on that Nym.
-    // (One must be supplied for EACH asset account during an exchange.)
-    //
-    int64_t lClosingTransactionNo;
+proto::UnitDefinition SecurityContract::IDVersion() const
+{
+    proto::UnitDefinition contract = ot_super::IDVersion();
 
-    BasketItem();
-    ~BasketItem()
-    {
-    }
-};
+    contract.set_type(Type());
+
+    auto security = contract.mutable_security();
+    security->set_version(1);
+    security->set_type(proto::EQUITYTYPE_SHARES);
+    security->set_issuedate(issue_date_);
+
+    return contract;
+}
 
 } // namespace opentxs
-
-#endif // OPENTXS_BASKET_BASKETITEM_HPP

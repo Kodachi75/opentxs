@@ -144,8 +144,14 @@ public:
     EXPORT CmdNewBasket();
     virtual ~CmdNewBasket();
 
-    EXPORT int32_t run(std::string server, std::string mynym,
-                       std::string assets, std::string minimum);
+    EXPORT int32_t run(
+        std::string server,
+        std::string mynym,
+        std::string assets,
+        std::string shortname,
+        std::string name,
+        std::string symbol,
+        std::string weight);
 
 protected:
     virtual int32_t runWithOptions();

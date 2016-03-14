@@ -63,7 +63,9 @@ App::App(const bool serverMode)
 
 void App::Init()
 {
+    shutdown_.store(false);
     Init_Config();
+    Init_Contracts();
     Init_Crypto();
     Init_Storage();
     Init_Dht();
@@ -75,6 +77,11 @@ void App::Init_Config()
     String strConfigFilePath;
     OTDataFolder::GetConfigFilePath(strConfigFilePath);
     config_ = new Settings(strConfigFilePath);
+}
+
+void App::Init_Contracts()
+{
+    contract_manager_.reset(new class Wallet);
 }
 
 void App::Init_Crypto()
@@ -117,6 +124,9 @@ void App::Init_Storage()
     Config().CheckSet_bool(
         "storage", "auto_publish_servers_",
         config.auto_publish_servers_, config.auto_publish_servers_, notUsed);
+    Config().CheckSet_bool(
+        "storage", "auto_publish_units_",
+        config.auto_publish_units_, config.auto_publish_units_, notUsed);
     Config().CheckSet_long(
         "storage", "gc_interval",
         config.gc_interval_, config.gc_interval_, notUsed);
@@ -184,6 +194,12 @@ void App::Init_Dht()
         "OpenDHT", "server_refresh_interval",
         config.server_refresh_interval_, server_refresh_interval_, notUsed);
     Config().CheckSet_long(
+        "OpenDHT", "unit_publish_interval",
+        config.unit_publish_interval_, unit_publish_interval_, notUsed);
+    Config().CheckSet_long(
+        "OpenDHT", "unit_refresh_interval",
+        config.unit_refresh_interval_, unit_refresh_interval_, notUsed);
+    Config().CheckSet_long(
         "OpenDHT", "listen_port",
         server_mode_ ? config.default_server_port_ : config.default_client_port_,
         config.listen_port_, notUsed);
@@ -194,18 +210,13 @@ void App::Init_Dht()
         "OpenDHT", "bootstrap_port",
         config.bootstrap_port_, config.bootstrap_port_, notUsed);
 
-    dht_ = &Dht::It(config);
+    dht_ = Dht::It(config);
 }
 
 void App::Init_Periodic()
 {
     auto storage = storage_;
     auto now = std::time(nullptr);
-
-    Schedule(
-        0,
-        [storage]()-> void{if (nullptr != storage) { storage->RunGC(); }},
-        now);
 
     Schedule(
         nym_publish_interval_,
@@ -238,22 +249,39 @@ void App::Init_Periodic()
         server_refresh_interval_,
         [storage]()-> void{
             ServerLambda serverLambda([](const proto::ServerContract& server)->
-                void { App::Me().DHT().GetServerContract(
-                    server.id(),
-                    [](const ServerContract&)->void{}); });
+                void { App::Me().DHT().GetServerContract(server.id()); });
             storage->MapServers(serverLambda);
         },
         (now - server_refresh_interval_ / 2));
 
-    periodic_thread_ = new std::thread(&App::Periodic, this);
+    Schedule(
+        unit_publish_interval_,
+        [storage]()-> void{
+            UnitLambda unitLambda([](const proto::UnitDefinition& unit)->
+                void { App::Me().DHT().Insert(unit); });
+            storage->MapUnitDefinitions(unitLambda);
+        },
+        now);
+
+    Schedule(
+        unit_refresh_interval_,
+        [storage]()-> void{
+            UnitLambda unitLambda([](const proto::UnitDefinition& unit)->
+                void { App::Me().DHT().GetUnitDefinition(unit.id()); });
+            storage->MapUnitDefinitions(unitLambda);
+        },
+        (now - unit_refresh_interval_ / 2));
+
+    std::thread periodic(&App::Periodic, this);
+    periodic.detach();
 }
 
 void App::Periodic()
 {
-    while (true) {
+    while (!shutdown_.load()) {
         std::time_t now = std::time(nullptr);
 
-        // Make sure list is not editied while we iterate
+        // Make sure list is not edited while we iterate
         std::lock_guard<std::mutex> listLock(task_list_lock_);
 
         for (auto& task : periodic_task_list) {
@@ -265,6 +293,10 @@ void App::Periodic()
                 taskThread.detach();
             }
         }
+
+        // This method has its own interval checking. Run here to avoid
+        // spawning unnecessary threads.
+        if (nullptr != storage_) { storage_->RunGC(); }
 
         Log::Sleep(std::chrono::milliseconds(100));
     }
@@ -310,6 +342,13 @@ Dht& App::DHT()
     return *dht_;
 }
 
+Wallet& App::Contract()
+{
+    OT_ASSERT(contract_manager_)
+
+    return *contract_manager_;
+}
+
 void App::Schedule(
     const time64_t& interval,
     const PeriodicTask& task,
@@ -338,11 +377,7 @@ void App::Cleanup()
 
 App::~App()
 {
-    if ((nullptr != periodic_thread_) && periodic_thread_->joinable()) {
-        periodic_thread_->join();
-        delete periodic_thread_;
-        periodic_thread_ = nullptr;
-    }
+    shutdown_.store(true);
     Cleanup();
 }
 

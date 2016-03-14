@@ -58,7 +58,7 @@ class OTSymmetricKey;
 class Letter;
 
 typedef std::multimap<std::string, OTAsymmetricKey*> mapOfAsymmetricKeys;
-typedef std::set<Nym*> setOfNyms;
+typedef std::set<const Nym*> setOfNyms;
 
 class OTEnvelope
 {

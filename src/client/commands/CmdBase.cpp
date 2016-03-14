@@ -38,6 +38,9 @@
 
 #include "CmdBase.hpp"
 
+#include <map>
+#include <sstream>
+
 #include "../ot_made_easy_ot.hpp"
 #include <opentxs/client/ot_otapi_ot.hpp>
 #include "../ot_utility_ot.hpp"
@@ -45,15 +48,13 @@
 #include <opentxs/client/OpenTransactions.hpp>
 #include <opentxs/client/OTAPI.hpp>
 #include <opentxs/client/OTWallet.hpp>
-#include <opentxs/ext/Helpers.hpp>
 #include <opentxs/core/Account.hpp>
-#include <opentxs/core/AssetContract.hpp>
 #include <opentxs/core/Log.hpp>
 #include <opentxs/core/Nym.hpp>
+#include "opentxs/core/app/App.hpp"
 #include <opentxs/core/contract/ServerContract.hpp>
-
-#include <map>
-#include <sstream>
+#include "opentxs/core/contract/UnitDefinition.hpp"
+#include <opentxs/ext/Helpers.hpp>
 
 using namespace opentxs;
 using namespace std;
@@ -216,94 +217,157 @@ bool CmdBase::checkMandatory(const char* name, const string& value) const
 
 bool CmdBase::checkNym(const char* name, string& nym, bool checkExistance) const
 {
-    if (!checkMandatory(name, nym)) {
+    if (!checkMandatory(name, nym))
         return false;
-    }
 
-    Nym      * pNym   = nullptr;
-    OTWallet * wallet = getWallet();
-
+    const Nym* pNym   = nullptr;
     const Identifier nymID(nym);
 
     if (!nymID.empty())
-        pNym = wallet->GetOrLoadNym(nymID);
+        pNym = OTAPI_Wrap::OTAPI()->GetOrLoadNym(nymID);
 
-    if (nullptr == pNym) {
-        pNym = wallet->GetNymByIDPartialMatch(nym);
-        if (nullptr == pNym && checkExistance) {
-            otOut << "Error: " << name << ": unknown nym: " << nym << "\n";
-            return false;
-        }
-    }
+    if (nullptr == pNym)
+        pNym = OTAPI_Wrap::OTAPI()->GetNymByIDPartialMatch(nym);
 
     if (nullptr != pNym) {
         String tmp;
         pNym->GetIdentifier(tmp);
         nym = tmp.Get();
     }
+    else if (checkExistance)
+    {
+        otOut << "Error: " << name << ": unknown nym: " << nym << "\n";
+        return false;
+    }
+
     otOut << "Using " << name << ": " << nym << "\n";
     return true;
 }
 
 bool CmdBase::checkPurse(const char* name, string& purse) const
 {
-    if (!checkMandatory(name, purse)) {
+    if (!checkMandatory(name, purse))
         return false;
-    }
-
-    AssetContract* pPurse = nullptr;
-    OTWallet* wallet = getWallet();
 
     Identifier theID(purse);
+    ConstUnitDefinition pUnit; //shared_ptr to const.
 
+    // See if it's available using the full length ID.
     if (!theID.empty())
-        pPurse = wallet->GetAssetContract(theID);
+        pUnit = App::Me().Contract().UnitDefinition(theID);
 
-    if (nullptr == pPurse) {
-        pPurse = wallet->GetAssetContractPartialMatch(purse);
-        if (nullptr == pPurse) {
-            otOut << "Error: " << name << ": unknown purse: " << purse << "\n";
-            return false;
+    if (!pUnit)
+    {
+        const auto units = App::Me().Contract().UnitDefinitionList();
+
+        // See if it's available using the partial length ID.
+        for (auto& it : units)
+        {
+            if (0 == it.first.compare(0, purse.length(), purse))
+            {
+                pUnit = App::Me().Contract().UnitDefinition(it.first);
+                break;
+            }
+        }
+        if (!pUnit)
+        {
+            // See if it's available using the full length name.
+            for (auto& it : units)
+            {
+                if (0 == it.second.compare(0, it.second.length(), purse))
+                {
+                    pUnit = App::Me().Contract().UnitDefinition(it.first);
+                    break;
+                }
+            }
+
+            if (!pUnit)
+            {
+                // See if it's available using the partial name.
+                for (auto& it : units)
+                {
+                    if (0 == it.second.compare(0, purse.length(), purse))
+                    {
+                        pUnit = App::Me().Contract().UnitDefinition(it.first);
+                        break;
+                    }
+                }
+            }
         }
     }
 
-    if (nullptr != pPurse)
+    if (!pUnit)
     {
-        String tmp;
-        pPurse->GetIdentifier(tmp);
-        purse = tmp.Get();
+        otOut << "Error: " << name << ": unknown unit definition: " << purse
+              << "\n";
+        return false;
     }
+
+    purse = String(pUnit->ID()).Get();
     otOut << "Using " << name << ": " << purse << "\n";
     return true;
 }
 
 bool CmdBase::checkServer(const char* name, string& server) const
 {
-    if (!checkMandatory(name, server)) {
+    if (!checkMandatory(name, server))
         return false;
-    }
-
-    ServerContract* pServer = nullptr;
-    OTWallet* wallet = getWallet();
 
     Identifier theID(server);
+    ConstServerContract pServer; //shared_ptr to const.
 
+    // See if it's available using the full length ID.
     if (!theID.empty())
-        pServer = wallet->GetServerContract(theID);
+        pServer = App::Me().Contract().Server(theID);
 
-    if (nullptr == pServer) {
-        pServer = wallet->GetServerContractPartialMatch(server);
-        if (nullptr == pServer) {
-            otOut << "Error: " << name << ": unknown server: " << server
-                  << "\n";
-            return false;
+    if (!pServer)
+    {
+        const auto servers = App::Me().Contract().ServerList();
+
+        // See if it's available using the partial length ID.
+        for (auto& it : servers)
+        {
+            if (0 == it.first.compare(0, server.length(), server))
+            {
+                pServer = App::Me().Contract().Server(it.first);
+                break;
+            }
+        }
+        if (!pServer)
+        {
+            // See if it's available using the full length name.
+            for (auto& it : servers)
+            {
+                if (0 == it.second.compare(0, it.second.length(), server))
+                {
+                    pServer = App::Me().Contract().Server(it.first);
+                    break;
+                }
+            }
+
+            if (!pServer)
+            {
+                // See if it's available using the partial name.
+                for (auto& it : servers)
+                {
+                    if (0 == it.second.compare(0, server.length(), server))
+                    {
+                        pServer = App::Me().Contract().Server(it.first);
+                        break;
+                    }
+                }
+            }
         }
     }
 
-    if (nullptr != pServer)
+    if (!pServer)
     {
-        server = pServer->ID().Get();
+        otOut << "Error: " << name << ": unknown server: " << server
+              << "\n";
+        return false;
     }
+
+    server = String(pServer->ID()).Get();
     otOut << "Using " << name << ": " << server << "\n";
     return true;
 }

@@ -39,6 +39,7 @@
 #include <opentxs/core/stdafx.hpp>
 
 #include <opentxs/client/OTAPI.hpp>
+#include <opentxs/client/OTAPI_Exec.hpp>
 #include <opentxs/client/OpenTransactions.hpp>
 #include <opentxs/client/OT_ME.hpp>
 #include <opentxs/client/OTClient.hpp>
@@ -49,12 +50,13 @@
 
 #include <opentxs/ext/Helpers.hpp>
 #include <opentxs/core/Account.hpp>
-#include <opentxs/core/AssetContract.hpp>
+#include "opentxs/core/contract/UnitDefinition.hpp"
 #include <opentxs/core/crypto/OTEnvelope.hpp>
 #include <opentxs/core/Log.hpp>
 #include <opentxs/core/Message.hpp>
 #include <opentxs/core/util/OTPaths.hpp>
 #include <opentxs/core/Nym.hpp>
+#include "opentxs/core/app/App.hpp"
 #include <opentxs/core/contract/ServerContract.hpp>
 #include <opentxs/core/script/OTVariable.hpp>
 
@@ -132,14 +134,21 @@ bool SetupPointersForWalletMyNymAndServerContract(
     if (str_NotaryID.size() > 0) {
         const Identifier NOTARY_ID(str_NotaryID.c_str());
 
-        pServerContract = pWallet->GetServerContract(NOTARY_ID);
+        pServerContract =
+            const_cast<ServerContract*>
+                (App::Me().Contract().Server(NOTARY_ID).get());
+
         // If failure, then we try PARTIAL match.
-        if (nullptr == pServerContract)
+        if (nullptr == pServerContract) {
+            std::string recoveredID =
+                OTAPI_Wrap::Exec()->Wallet_GetNotaryIDFromPartial(str_NotaryID);
             pServerContract =
-                pWallet->GetServerContractPartialMatch(str_NotaryID);
+                const_cast<ServerContract*>
+                    (App::Me().Contract().Server(recoveredID).get());
+        }
 
         if (nullptr != pServerContract) {
-            str_NotaryID = pServerContract->ID().Get();
+            str_NotaryID = String(pServerContract->ID()).Get();
             otOut << "Using as server: " << str_NotaryID << "\n";
         }
         else {
@@ -161,7 +170,7 @@ bool SetupPointersForWalletMyNymAndServerContract(
     if (str_MyNym.size() > 0) {
         const Identifier MY_NYM_ID(str_MyNym.c_str());
 
-        pMyNym = pWallet->GetNymByID(MY_NYM_ID);
+        pMyNym = OTAPI_Wrap::OTAPI()->GetNym(MY_NYM_ID);
 
         // If failure, then we try PARTIAL match.
         if (nullptr == pMyNym)
@@ -906,7 +915,7 @@ int32_t main(int32_t argc, char* argv[])
         if (str_HisNym.size() > 0) {
             const Identifier HIS_NYM_ID(str_HisNym.c_str());
 
-            pHisNym = pWallet->GetNymByID(HIS_NYM_ID);
+            pHisNym = OTAPI_Wrap::OTAPI()->GetNym(HIS_NYM_ID);
             // If failure, then we try PARTIAL match.
             if (nullptr == pHisNym)
                 pHisNym = pWallet->GetNymByIDPartialMatch(str_HisNym);
@@ -930,31 +939,60 @@ int32_t main(int32_t argc, char* argv[])
         // based on the ID that the user has entered here.
 
         Identifier thePurseInstrumentDefinitionID;
-        AssetContract* pMyAssetContract = nullptr;
+        ConstUnitDefinition pMyUnitDefinition; //shared_ptr to const.
 
-        if (str_MyPurse.size() > 0) {
-            const Identifier MY_INSTRUMENT_DEFINITION_ID(str_MyPurse.c_str());
-            pMyAssetContract =
-                pWallet->GetAssetContract(MY_INSTRUMENT_DEFINITION_ID);
+        // See if it's available using the full length ID.
+        if (!str_MyPurse.empty())
+            pMyUnitDefinition = App::Me().Contract().UnitDefinition(str_MyPurse);
 
-            // If failure, then we try PARTIAL match.
-            if (nullptr == pMyAssetContract)
-                pMyAssetContract =
-                    pWallet->GetAssetContractPartialMatch(str_MyPurse);
+        if (!pMyUnitDefinition)
+        {
+            const auto units = App::Me().Contract().UnitDefinitionList();
 
-            if (nullptr != pMyAssetContract) {
-                String strTemp;
-                pMyAssetContract->GetIdentifier(strTemp);
-
-                str_MyPurse = strTemp.Get();
-                otOut << "Using as mypurse: " << str_MyPurse << "\n";
-
-                pMyAssetContract->GetIdentifier(thePurseInstrumentDefinitionID);
+            // See if it's available using the partial length ID.
+            for (auto& it : units)
+            {
+                if (0 == it.first.compare(0, str_MyPurse.length(), str_MyPurse))
+                {
+                    pMyUnitDefinition = App::Me().Contract().UnitDefinition(it.first);
+                    break;
+                }
             }
-            // Execution continues here, so the script has the option to
-            // download
-            // any asset contract, if it can't find it in the wallet.
+            if (!pMyUnitDefinition)
+            {
+                // See if it's available using the full length name.
+                for (auto& it : units)
+                {
+                    if (0 == it.second.compare(0, it.second.length(), str_MyPurse))
+                    {
+                        pMyUnitDefinition = App::Me().Contract().UnitDefinition(it.first);
+                        break;
+                    }
+                }
+
+                if (!pMyUnitDefinition)
+                {
+                    // See if it's available using the partial name.
+                    for (auto& it : units)
+                    {
+                        if (0 == it.second.compare(0, str_MyPurse.length(), str_MyPurse))
+                        {
+                            pMyUnitDefinition = App::Me().Contract().UnitDefinition(it.first);
+                            break;
+                        }
+                    }
+                }
+            }
         }
+
+        if (pMyUnitDefinition) {
+            thePurseInstrumentDefinitionID = pMyUnitDefinition->ID();
+
+            str_MyPurse = String(thePurseInstrumentDefinitionID).Get();
+            otOut << "Using as mypurse: " << str_MyPurse << "\n";
+
+        }
+
         // if no purse (instrument definition) ID was provided, but MyAccount
         // WAS provided,
         // then
@@ -966,34 +1004,64 @@ int32_t main(int32_t argc, char* argv[])
             String strTempAssetType(thePurseInstrumentDefinitionID);
             str_MyPurse = strTempAssetType.Get();
         }
-        // BELOW THIS POINT, pMyAssetContract MIGHT be nullptr, or MIGHT be an
+        // BELOW THIS POINT, pMyUnitDefinition MIGHT be nullptr, or MIGHT be an
         // asset
         // type specified by the user.
         // There's no guarantee that it's available, but if it IS, then it WILL
         // be
         // available below this point.
         Identifier hisPurseInstrumentDefinitionID;
+        ConstUnitDefinition pHisUnitDefinition; //shared_ptr to const.
 
-        if (str_HisPurse.size() > 0) {
-            const Identifier HIS_INSTRUMENT_DEFINITION_ID(str_HisPurse.c_str());
-            AssetContract* pHisAssetContract =
-                pWallet->GetAssetContract(HIS_INSTRUMENT_DEFINITION_ID);
+        // See if it's available using the full length ID.
+        if (!str_HisPurse.empty())
+            pHisUnitDefinition = App::Me().Contract().UnitDefinition(str_HisPurse);
 
-            // If failure, then we try PARTIAL match.
-            if (nullptr == pHisAssetContract)
-                pHisAssetContract =
-                    pWallet->GetAssetContractPartialMatch(str_HisPurse);
+        if (!pHisUnitDefinition)
+        {
+            const auto units = App::Me().Contract().UnitDefinitionList();
 
-            if (nullptr != pHisAssetContract) {
-                String strTemp;
-                pHisAssetContract->GetIdentifier(strTemp);
-
-                str_HisPurse = strTemp.Get();
-                otOut << "Using as hispurse: " << str_HisPurse << "\n";
-
-                pHisAssetContract->GetIdentifier(
-                    hisPurseInstrumentDefinitionID);
+            // See if it's available using the partial length ID.
+            for (auto& it : units)
+            {
+                if (0 == it.first.compare(0, str_HisPurse.length(), str_HisPurse))
+                {
+                    pHisUnitDefinition = App::Me().Contract().UnitDefinition(it.first);
+                    break;
+                }
             }
+            if (!pHisUnitDefinition)
+            {
+                // See if it's available using the full length name.
+                for (auto& it : units)
+                {
+                    if (0 == it.second.compare(0, it.second.length(), str_HisPurse))
+                    {
+                        pHisUnitDefinition = App::Me().Contract().UnitDefinition(it.first);
+                        break;
+                    }
+                }
+
+                if (!pHisUnitDefinition)
+                {
+                    // See if it's available using the partial name.
+                    for (auto& it : units)
+                    {
+                        if (0 == it.second.compare(0, str_HisPurse.length(), str_HisPurse))
+                        {
+                            pHisUnitDefinition = App::Me().Contract().UnitDefinition(it.first);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        if (pHisUnitDefinition) {
+            hisPurseInstrumentDefinitionID = pHisUnitDefinition->ID();
+
+            str_HisPurse = String(hisPurseInstrumentDefinitionID).Get();
+            otOut << "Using as hispurse: " << str_HisPurse << "\n";
+
         }
         // If no "HisPurse" was provided, but HisAcct WAS, then we use the
         // instrument definition of HisAcct as HisPurse.
@@ -1007,10 +1075,10 @@ int32_t main(int32_t argc, char* argv[])
 
         otOut << "\n";
 
-        // Also, pAccount and pMyAssetContract have not be validated AGAINST
+        // Also, pAccount and pMyUnitDefinition have not be validated AGAINST
         // EACH
         // OTHER (yet)...
-        // Also, pHisAccount and pHisAssetContract have not be validated AGAINST
+        // Also, pHisAccount and pHisUnitDefinition have not be validated AGAINST
         // EACH OTHER (yet)...
 
         /*  GET THE ACTUAL ARGUMENTS AFTER THE OPTIONS */
@@ -1356,7 +1424,7 @@ int32_t main(int32_t argc, char* argv[])
             if (0 < OTAPI_Wrap::OTAPI()->GetClient()->ProcessUserCommand(
                         OTClient::notarizePurse, theMessage, *pMyNym,
                         *pServerContract, pMyAccount, 0, // amount (unused here)
-                        pMyAssetContract)) {
+                        pMyUnitDefinition.get())) {
                 bSendCommand = true;
             }
             else
@@ -1400,9 +1468,9 @@ int32_t main(int32_t argc, char* argv[])
         }
 
         //
-        const Nym* pServerNym = pServerContract->PublicNym();
+        auto pServerNym = pServerContract->Nym();
 
-        if ((nullptr == pServerNym) ||
+        if (!pServerNym ||
             (false == pServerNym->VerifyPseudonym())) {
             otOut << "The server Nym was nullptr or failed to verify on server "
                      "contract: " << strNotaryID << "\n";
@@ -1779,7 +1847,7 @@ int32_t main(int32_t argc, char* argv[])
                     ServerContract * GetServerContractPartialMatch(const
       std::string
       PARTIAL_ID);
-                    OTAssetContract * GetAssetContractPartialMatch(const
+                    OTUnitDefinition * GetUnitDefinitionPartialMatch(const
       std::string
       PARTIAL_ID);
                     OTAccount *         GetAccountPartialMatch(const std::string
@@ -2037,9 +2105,9 @@ int32_t main(int32_t argc, char* argv[])
             continue;
         }
 
-        const Nym* pServerNym = pServerContract->PublicNym();
+        auto pServerNym = pServerContract->Nym();
 
-        if (bSendCommand && (nullptr != pServerNym) &&
+        if (bSendCommand && pServerNym &&
             pServerNym->VerifyPseudonym()) {
             OTAPI_Wrap::OTAPI()->SendMessage(pServerContract, pMyNym,
                                              theMessage);

@@ -1003,7 +1003,7 @@ SerializedCredentialSet CredentialSet::Serialize(
     return credSet;
 }
 
-bool CredentialSet::GetContactData(proto::ContactData& contactData) const
+bool CredentialSet::GetContactData(std::shared_ptr<proto::ContactData>& contactData) const
 {
     bool found = false;
 
@@ -1092,7 +1092,7 @@ bool CredentialSet::AddContactCredential(const proto::ContactData& contactData)
 
     m_mapCredentials.insert(
         std::pair<std::string, Credential*>(
-            newChildCredential->ID().Get(),
+            String(newChildCredential->ID()).Get(),
             newChildCredential));
 
     return true;
@@ -1117,7 +1117,7 @@ bool CredentialSet::AddVerificationCredential(
 
     m_mapCredentials.insert(
         std::pair<std::string, Credential*>(
-            newChildCredential->ID().Get(),
+            String(newChildCredential->ID()).Get(),
             newChildCredential));
 
     return true;
@@ -1206,8 +1206,8 @@ bool CredentialSet::Sign(
 
 bool CredentialSet::Verify(
     const OTData& plaintext,
-    proto::Signature& sig,
-    proto::KeyRole key) const
+    const proto::Signature& sig,
+    const proto::KeyRole key) const
 {
     String signerID(sig.credentialid());
 
@@ -1246,9 +1246,13 @@ bool CredentialSet::TransportKey(
 {
     // Find the first private child credential
     for (auto& it: m_mapCredentials) {
-        if (nullptr != it.second) {
-            if (it.second->canSign()) {
-                return it.second->TransportKey(publicKey, privateKey);
+        Credential* childCred = it.second;
+
+        OT_ASSERT(nullptr != childCred);
+
+        if (nullptr != childCred) {
+            if (childCred->canSign()) {
+                return childCred->TransportKey(publicKey, privateKey);
             }
         }
     }

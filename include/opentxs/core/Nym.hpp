@@ -68,6 +68,7 @@ class ServerContract;
 class Credential;
 class OTTransaction;
 class Tag;
+class Wallet;
 
 typedef std::deque<Message*> dequeOfMail;
 typedef std::map<std::string, int64_t> mapOfRequestNums;
@@ -85,31 +86,24 @@ typedef std::tuple<std::string, uint32_t, uint32_t, std::string, int64_t, int64_
 
 class Nym
 {
+    friend class Wallet;
 public:
     static const CredentialIndexModeFlag ONLY_IDS = true;
     static const CredentialIndexModeFlag FULL_CREDS = false;
+    Nym(const Nym&) = default;
 private:
+    std::string alias_;
     uint32_t credential_index_version_ = 0;
-    Nym(const Nym&);
+    uint64_t credential_index_revision_ = 0;
     Nym& operator=(const Nym&);
 
     bool m_bPrivate = false;
     bool m_bMarkForDeletion; // Default FALSE. When set to true, saves a
                              // "DELETED" flag with this Nym,
     // for easy cleanup later when the server is doing some maintenance.
-    String m_strName; // Used by the wallet so the nym is easily identified by
-                      // the user
-                      // The internals, and server, prefer nymID to name.
     String m_strNymfile; // This contains the request numbers and other user
                          // acct info. XML.
-    // Client-side only, since the server uses nymID for filenames
-    String m_strCertfile; // Filename for pem file that contains the x509
-                          // Certificate. ----BEGIN etc...
-                          // Client-side only for now.
-
     String m_strVersion;    // This goes with the Nymfile
-    OTASCIIArmor m_ascCert; // Just the ascii-armor portion without BEGIN and
-                            // END
     std::shared_ptr<NymIDSource> source_; // Hash this to form the NymID. Can
                                           // be a
                                 // public key, or a URL, or DN info from a
@@ -219,12 +213,14 @@ private:
     String::List m_listRevokedIDs; // std::string list, any revoked Credential
                                    // IDs. (Mainly for child credentials)
 public:
+    EXPORT std::string Alias() const { return alias_; }
+    EXPORT void SetAlias(const std::string& alias) { alias_ = alias; }
+    EXPORT uint64_t Revision() const { return credential_index_revision_; }
     EXPORT void GetPrivateCredentials(String& strCredList,
                                       String::Map* pmapCredFiles = nullptr);
-    EXPORT const String asPublicNym() const;
+    EXPORT const serializedCredentialIndex asPublicNym() const;
     EXPORT size_t GetMasterCredentialCount() const;
     EXPORT size_t GetRevokedCredentialCount() const;
-    EXPORT CredentialSet* GetMasterCredential(const String& strID);
     EXPORT CredentialSet* GetRevokedCredential(const String& strID);
     EXPORT const CredentialSet* GetMasterCredentialByIndex(int32_t nIndex) const;
     EXPORT const CredentialSet* GetRevokedCredentialByIndex(
@@ -235,7 +231,21 @@ public:
                                         Identifier& theOutput); // server-side
     EXPORT void SetNymboxHashServerSide(
         const Identifier& theInput); // server-side
+    EXPORT std::shared_ptr<const proto::Credential> MasterCredentialContents(
+        const std::string& id) const;
+    EXPORT std::shared_ptr<const proto::Credential> RevokedCredentialContents(
+        const std::string& id) const;
+    EXPORT int32_t ChildCredentialCount(const std::string& masterID) const;
+    EXPORT std::string ChildCredentialID(
+        const std::string& masterID,
+        const uint32_t index) const;
+    EXPORT std::shared_ptr<const proto::Credential> ChildCredentialContents(
+        const std::string& masterID,
+        const std::string& childID) const;
+
 private:
+    const CredentialSet* MasterCredential(const String& strID) const;
+    CredentialSet* GetMasterCredential(const String& strID);
     // Generic function used by the below functions.
     bool GetHash(const mapOfIdentifiers& the_map, const std::string& str_id,
                  Identifier& theOutput) const; // client-side
@@ -243,10 +253,7 @@ private:
                  const Identifier& theInput); // client-side
     void SetAsPrivate(bool isPrivate = true);
     bool isPrivate() const;
-    //    OTIdentifier          m_NymboxHash;       // (Server-side) Hash of the
-    // Nymbox
-    //  mapOfIdentifiers      m_mapNymboxHash;    // (Client-side) Hash of
-    // Nymbox (OTIdentifier) mapped by NotaryID (std::string)
+
 public:
     // This value is only updated on client side, when the actual latest
     // nymbox has been downloaded.
@@ -316,19 +323,13 @@ public:
     {
         return m_setAccounts;
     } // stores acct IDs as std::string
-    inline String& GetNymName()
-    {
-        return m_strName;
-    }
-    inline void SetNymName(const String& strName)
-    {
-        m_strName = strName;
-    }
     EXPORT Nym();
     EXPORT Nym(const NymParameters& nymParameters);
     EXPORT Nym(const Identifier& nymID);
     EXPORT Nym(const String& strNymID);
+private:
     EXPORT Nym(const String& name, const String& filename, const String& nymID);
+public:
     EXPORT virtual ~Nym();
     EXPORT void Initialize();
     EXPORT void ReleaseTransactionNumbers();
@@ -343,13 +344,8 @@ public:
                                         // SET PUBLIC KEY BASED ON INPUT STRING
 
     // CALLER is responsible to delete the Nym ptr being returned
-    // in these functions!
+    // in this functions!
     //
-    EXPORT static Nym* LoadPublicNym(const Identifier& NYM_ID,
-                                     const String* pstrName = nullptr,
-                                     const char* szFuncName = nullptr,
-                                     bool bChecking=false);
-
     EXPORT static Nym* LoadPrivateNym(
         const Identifier& NYM_ID, bool bChecking = false,
         const String* pstrName = nullptr, const char* szFuncName = nullptr,
@@ -376,16 +372,11 @@ private:
     EXPORT void SaveCredentialsToTag(Tag& parent,
                                      String::Map* pmapPubInfo = nullptr,
                                      String::Map* pmapPriInfo = nullptr) const;
-    OTData CredentialIndexAsData() const;
-    String CredentialIndexAsString() const;
-    static serializedCredentialIndex ExtractArmoredCredentialIndex(const String& StringIndex);
-    static serializedCredentialIndex ExtractArmoredCredentialIndex(const OTASCIIArmor& armoredIndex);
-
-public:
     serializedCredentialIndex SerializeCredentialIndex(
         const CredentialIndexModeFlag mode = ONLY_IDS) const;
+
+public:
     bool LoadCredentialIndex(const serializedCredentialIndex& index);
-    bool LoadCredentialIndex(const String& armoredIndex);
     EXPORT bool LoadCredentials(bool bLoadPrivate = false, // Loads public
                                                            // credentials by
                                 // default. For private, pass true.
@@ -456,6 +447,7 @@ public:
 
     EXPORT void GetIdentifier(Identifier& theIdentifier) const; // BINARY
                                                                 // VERSION
+    EXPORT const Identifier& ID() const { return m_nymID; }
     EXPORT void SetIdentifier(const Identifier& theIdentifier);
 
     EXPORT void GetIdentifier(String& theIdentifier) const; // STRING VERSION
@@ -854,7 +846,7 @@ public:
     EXPORT void DisplayStatistics(String& strOutput);
 
     EXPORT bool WriteCredentials() const;
-    proto::ContactData ContactData() const;
+    std::shared_ptr<proto::ContactData> ContactData() const;
     bool SetContactData(const proto::ContactData& data);
 
     std::shared_ptr<proto::VerificationSet> VerificationSet() const;
@@ -870,7 +862,10 @@ public:
         const int64_t end = 0,
         const OTPasswordData* pPWData = nullptr) const;
     bool Sign(proto::ServerContract& contract) const;
-    bool Verify(const OTData& plaintext, proto::Signature& sig) const;
+    bool Sign(
+        const proto::UnitDefinition& contract,
+        proto::Signature& sig) const;
+    bool Verify(const OTData& plaintext, const proto::Signature& sig) const;
     bool Verify(const proto::Verification& item) const;
     zcert_t* TransportKey() const;
 };

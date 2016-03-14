@@ -544,8 +544,8 @@ bool Libsecp256k1::secp256k1_pubkey_serialize(
         const secp256k1_pubkey& pubkey) const
 {
     if (nullptr != context_) {
-        uint8_t serializedOutput [65] {};
-        size_t serializedSize = 0;
+        uint8_t serializedOutput [33] {};
+        size_t serializedSize = 33;
 
         bool serialized = secp256k1_ec_pubkey_serialize(context_, serializedOutput, &serializedSize, &pubkey, SECP256K1_EC_COMPRESSED);
 

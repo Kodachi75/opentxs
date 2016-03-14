@@ -36,52 +36,64 @@
  *
  ************************************************************/
 
-#ifndef OPENTXS_CORE_CRYPTO_CONTACTCREDENTIAL_HPP
-#define OPENTXS_CORE_CRYPTO_CONTACTCREDENTIAL_HPP
+#ifndef OPENTXS_CORE_SIGNABLE_HPP
+#define OPENTXS_CORE_SIGNABLE_HPP
 
+#include <list>
 #include <memory>
+#include <string>
 
 #include <opentxs-proto/verify/VerifyCredentials.hpp>
 
-#include <opentxs/core/Nym.hpp>
-#include <opentxs/core/crypto/Credential.hpp>
-#include <opentxs/core/crypto/NymParameters.hpp>
+#include "opentxs/core/Identifier.hpp"
+#include "opentxs/core/OTData.hpp"
 
 namespace opentxs
 {
 
-class String;
+typedef std::shared_ptr<const class Nym> ConstNym;
+typedef std::shared_ptr<proto::Signature> SerializedSignature;
+typedef std::list<SerializedSignature> Signatures;
 
-class ContactCredential : public Credential
+class Nym;
+
+class Signable
 {
-private:
-    typedef Credential ot_super;
-    friend class Credential;
+protected:
+    std::string alias_;
+    Identifier id_;
+    ConstNym nym_;
+    Signatures signatures_;
+    uint32_t version_ = 0;
+    std::string conditions_; // Human-readable portion
 
-    std::unique_ptr<proto::ContactData> data_;
+    // Calculate identifier
+    virtual Identifier GetID() const = 0;
+    // Calculate and unconditionally set id_
+    bool CalculateID() { id_ = GetID(); return true; }
+    // Calculate the ID and verify that it matches the existing id_ value
+    bool CheckID() const { return (GetID() == id_); }
 
-    ContactCredential() = delete;
-    ContactCredential(
-        CredentialSet& parent,
-        const proto::Credential& credential);
-    ContactCredential(
-        CredentialSet& parent,
-        const NymParameters& nymParameters);
+    Signable() = delete;
+    Signable(const ConstNym& nym);
 
 public:
-    static Claim asClaim(
-        const String& nymid,
-        const uint32_t section,
-        const proto::ContactItem& item);
+    ConstNym Nym() const { return nym_; }
 
-    bool GetContactData(std::shared_ptr<proto::ContactData>& contactData) const override;
-    serializedCredential asSerialized(
-        SerializationModeFlag asPrivate,
-        SerializationSignatureFlag asSigned) const override;
+    virtual std::string Alias() const { return alias_; }
 
-    virtual ~ContactCredential() = default;
+    virtual Identifier ID() const { return id_; }
+    virtual std::string Terms() const { return conditions_; }
+
+    virtual void SetAlias(std::string alias) { alias_ = alias;}
+
+    virtual std::string Name() const = 0;
+    virtual OTData Serialize() const = 0;
+    virtual bool Validate() const = 0;
+
+    virtual ~Signable() = default;
 };
 
 } // namespace opentxs
 
-#endif // OPENTXS_CORE_CRYPTO_CONTACTCREDENTIAL_HPP
+#endif // OPENTXS_CORE_SIGNABLE_HPP

@@ -41,11 +41,11 @@
 #include <opentxs/server/ClientConnection.hpp>
 #include <opentxs/server/Macros.hpp>
 #include <opentxs/server/ServerSettings.hpp>
-#include <opentxs/basket/BasketContract.hpp>
-#include <opentxs/basket/Basket.hpp>
+#include <opentxs/core/contract/basket/BasketContract.hpp>
+#include <opentxs/core/contract/basket/Basket.hpp>
 #include <opentxs/core/script/OTParty.hpp>
 #include <opentxs/core/script/OTSmartContract.hpp>
-#include <opentxs/core/AssetContract.hpp>
+#include "opentxs/core/contract/UnitDefinition.hpp"
 #include <opentxs/core/Message.hpp>
 #include <opentxs/core/Nym.hpp>
 #include <opentxs/core/Log.hpp>
@@ -54,10 +54,12 @@
 #include <opentxs/core/crypto/OTASCIIArmor.hpp>
 #include <opentxs/core/util/OTFolders.hpp>
 #include <opentxs/core/OTStorage.hpp>
+#include <opentxs/core/Proto.hpp>
 #include <opentxs/core/Ledger.hpp>
 #include <opentxs/cash/Mint.hpp>
 #include <opentxs/core/app/App.hpp>
 #include <opentxs/core/trade/OTMarket.hpp>
+
 
 namespace opentxs
 {
@@ -198,55 +200,17 @@ bool UserCommandProcessor::ProcessUserCommand(Message& theMessage,
                            "fresh Nym to use. ***\n");
             return false;
         }
-        // NOTE: This action may very well be a malicious attacker
-        // saving a false
-        // credential list and a false set of credentials under a
-        // certain Nym ID!
-        // However, a Nym is always verified after loading, before
-        // being used for
-        // anything. (AND MUST BE.) And that includes before being
-        // saved to disk.
-        //
-        // DILEMMA at this point was, I don't want to save the
-        // credentials into the
-        // actual folder locations BEFORE they have been verified...
-        // SO I had to add "LoadFromString" functions to
-        // CredentialSet (which I have done.)
-        // So now I should be able to continue here, load the
-        // credentials up from string,
-        // verify them, and if verified, THEN save them to disk...
-        // OTPseudonym::LoadFromString now allows you to load
-        // credentials from the map passed
-        // in (from the message) versus just reading them from local
-        // storage.
-        //
-        String publicNym(theMessage.m_ascPayload.Get());
-        if (false ==
-            pNym->LoadCredentialIndex(publicNym)) {
-            Log::vError("%s: registerNymResponse: Failure loading nym %s "
-                        "from credential string.\n",
-                        __FUNCTION__, theMessage.m_strNymID.Get());
-        }
-        // Now that the Nym has been loaded up from the message
-        // parameters,
-        // including the list of credential IDs, and the map
-        // containing the
-        // credentials themselves, let's try to Verify the
-        // pseudonym. If we
-        // verify, then we're safe to save the credentials to
-        // storage.
-        //
-        else if (!pNym->VerifyPseudonym()) {
-            Log::vError("%s: registerNymResponse: Loaded nym %s "
-                        "from credentials, but then it failed verifying.\n",
-                        __FUNCTION__, theMessage.m_strNymID.Get());
-        }
-        else // Okay, we loaded the Nym up from the credentials in
-                // the message, AND
-        {      // verified the Nym (including the credentials.)
-            // So let's save it to local storage...
-            //
+        auto serialized =
+            proto::DataToProto<proto::CredentialIndex>
+                (OTData(theMessage.m_ascPayload));
+        auto nym = App::Me().Contract().Nym(serialized);
 
+        if (!nym) {
+            Log::vError("%s: registerNymResponse: Invalid nym %s \n",
+            __FUNCTION__, serialized.nymid().c_str());
+        } else
+        {
+            pNym->LoadCredentialIndex(nym->asPublicNym());
             Log::Output(3, "Pseudonym verified!\n");
             // Okay, now that the Nym is verified, let's verify the
             // message itself...
@@ -265,13 +229,6 @@ bool UserCommandProcessor::ProcessUserCommand(Message& theMessage,
             }
             Log::Output(3, "Signature verified! The message WAS signed by "
                             "the Nym\'s private authentication key.\n");
-            // SAVE the credentials to local storage, now that
-            // things are verified.
-            //
-
-            if (!pNym->WriteCredentials()) {
-                return false;
-            }
 
             // Make sure we are encrypting the message we send
             // back, if possible.
@@ -1807,30 +1764,12 @@ void UserCommandProcessor::UserCmdCheckNym(Nym&, Message& MsgIn,
 
     msgOut.m_bSuccess = false;
 
-    Nym nym2;
-    nym2.SetIdentifier(MsgIn.m_strNymID2);
+    auto nym2 = App::Me().Contract().Nym(MsgIn.m_strNymID2.Get());
 
-    bool bLoaded      = MsgIn.m_strNymID2.empty() ? false : nym2.LoadPublicKey(); // This calls LoadCredentials inside.
-    bool bTempSuccess = (bLoaded && nym2.VerifyPseudonym());
-
-    // If success, we send the Nym2's public key back to the user.
-    if (bTempSuccess)
-    {
-        nym2.GetPublicEncrKey().GetPublicKey(msgOut.m_strNymPublicKey);
-
-        // NEW: Also attach the public credentials to the response
-        //      (not just a public key.)
-        //
-        if (nym2.GetMasterCredentialCount() > 0)
-        {
-            const String publicNym = nym2.asPublicNym();
-
-            if (!publicNym.empty())
-            {
-                msgOut.m_ascPayload.Set(publicNym.Get());
-                msgOut.m_bSuccess = true;
-            }
-        }
+    // If success, return nym2 in serialized form
+    if (nym2) {
+        msgOut.m_ascPayload.SetData(proto::ProtoAsData(nym2->asPublicNym()));
+        msgOut.m_bSuccess = true;
     }
     // --------------------------------------------------
     // if Failed, we send the user's message back to him, ascii-armored as part
@@ -2091,284 +2030,175 @@ void UserCommandProcessor::UserCmdRegisterInstrumentDefinition(Nym& theNym,
     const Identifier NYM_ID(theNym), NOTARY_ID(server_->m_strNotaryID),
         INSTRUMENT_DEFINITION_ID(MsgIn.m_strInstrumentDefinitionID);
 
-    AssetContract* pAssetContract =
-        server_->transactor_.getAssetContract(INSTRUMENT_DEFINITION_ID);
+    auto pUnitDefinition =
+        App::Me().Contract().UnitDefinition(INSTRUMENT_DEFINITION_ID);
 
     // Make sure the contract isn't already available on this server.
     //
-    if (nullptr != pAssetContract) // it exists already.
-    {
+    if (pUnitDefinition) {
         Log::vError("%s: Error: Attempt to issue instrument definition that "
                     "already exists.\n",
                     szFunc);
-    }
-    else {
-        // Pull the contract out of the message and verify it.
-        String strFoldername(OTFolders::Contract().Get()),
-            strFilename(MsgIn.m_strInstrumentDefinitionID.Get());
+    } else {
+        auto serialized =
+            proto::DataToProto<proto::UnitDefinition>
+                (OTData(MsgIn.m_ascPayload));
+        if (proto::UNITTYPE_BASKET == serialized.type()) {
+            Log::vOutput(0, "%s: Prevented attempt by user to issue a "
+            "basket currency contract. (He needs to use "
+            "the issueBasket message for that.)\n",
+            szFunc);
+        } else {
+            pUnitDefinition =
+                App::Me().Contract().UnitDefinition(serialized);
 
-        String strContract(MsgIn.m_ascPayload);
-        pAssetContract =
-            new AssetContract(MsgIn.m_strInstrumentDefinitionID, strFoldername,
-                              strFilename, MsgIn.m_strInstrumentDefinitionID);
+            if (!pUnitDefinition) {
+                Log::vOutput(0, "%s: Failed trying to instantiate asset "
+                                "contract. Instrument Definition Id: %s\n",
+                            szFunc, MsgIn.m_strInstrumentDefinitionID.Get());
+            } else {
+                // Create an ISSUER account (like a normal account, except
+                // it can go negative)
+                std::unique_ptr<Account> pNewAccount(
+                    Account::GenerateNewAccount(NYM_ID, NOTARY_ID,
+                                                server_->m_nymServer, MsgIn,
+                                                Account::issuer));
 
-        Identifier ASSET_NYM_ID;
-        bool bSuccessCalculateDigest = false;
+                // If we successfully create the account, then bundle it in
+                // the message XML payload
+                if (nullptr !=
+                    pNewAccount) // This last parameter generates an
+                                    // ISSUER account
+                {                // instead of the default SIMPLE.
+                    // Make sure the contracts/%s file is created for next
+                    // time.
+                    String tempPayload(*pNewAccount);
+                    msgOut.m_ascPayload.SetString(tempPayload);
 
-        if (nullptr == pAssetContract) {
-            Log::vOutput(0, "%s: Failed trying to instantiate asset "
-                            "contract. Instrument Definition Id: %s\n",
-                         szFunc, MsgIn.m_strInstrumentDefinitionID.Get());
-        }
-        else // success instantiating contract.
-        {
-            bool bSuccessLoadingContract =
-                pAssetContract->LoadContractFromString(strContract);
+                    // Attach the new account number to the outgoing
+                    // message.
+                    pNewAccount->GetIdentifier(msgOut.m_strAcctID);
 
-            if (!bSuccessLoadingContract) {
-                Log::vOutput(0, "%s: Failed trying to load asset contract "
-                                "from string. Instrument Definition Id: %s\n",
-                             szFunc, MsgIn.m_strInstrumentDefinitionID.Get());
-                Log::vOutput(1, "%s: Failed trying to load asset contract "
-                                "from string. Contract:\n\n%s\n\n",
-                             szFunc, strContract.Get());
-            }
-            else if (pAssetContract->GetBasketInfo().Exists()) {
-                Log::vOutput(0, "%s: Prevented attempt by user to issue a "
-                                "basket currency contract. (He needs to use "
-                                "the issueBasket message for that.)\n",
-                             szFunc);
-            }
-            else // success loading contract from string.
-            {
-                Nym* pNym =
-                    const_cast<Nym*>(pAssetContract->GetContractPublicNym());
+                    server_->mainFile_.SaveMainFile();
 
-                if (nullptr == pNym) {
-                    Log::vOutput(0, "%s: Failed trying to retrieve Issuer's "
-                                    "public key from asset "
-                                    "contract. Instrument Definition Id: %s\n",
-                                 szFunc,
-                                 MsgIn.m_strInstrumentDefinitionID.Get());
-                }
-                else // success retrieving issuer Nym's public key from asset
-                       // contract.
-                {
-                    pNym->GetIdentifier(ASSET_NYM_ID);
+                    Identifier theNewAccountID;
+                    pNewAccount->GetIdentifier(theNewAccountID);
+                    Log::Output(
+                        0,
+                        "Generating inbox/outbox for new issuer acct. \n");
 
-                    bSuccessCalculateDigest = true;
-                }
-            }
-        }
+                    Ledger theOutbox(NYM_ID, theNewAccountID, NOTARY_ID),
+                        theInbox(NYM_ID, theNewAccountID, NOTARY_ID);
 
-        // Make sure the public key in the contract is the public key of the
-        // Nym.
-        // If we successfully loaded the contract from the string, and the
-        // contract
-        // internally verifies (the ID matches the hash of the contract, and the
-        // signature verifies with the contract key that's inside the contract),
-        // AND the Nym making this request has the same ID as the Nym in the
-        // asset contract. (ONLY the issuer of that contract can connect to this
-        // server and issue his currency.)
-        // TODO make sure a receipt is issued that the issuer can post on his
-        // website, to verify that he has indeed issued the currency at the
-        // specified
-        // transaction processor.  That way, users can double-check.
-        if (bSuccessCalculateDigest) {
-            if ((ASSET_NYM_ID == NYM_ID))
-            // The ID of the user who signed the contract must be the ID of
-            // the user
-            // whose public key is associated with this user account. They
-            // are one.
-            {
-                if (pAssetContract->VerifyContract()) {
-                    // Create an ISSUER account (like a normal account, except
-                    // it can go negative)
-                    App::Me().DHT().Insert(
-                        MsgIn.m_strInstrumentDefinitionID.Get(),
-                        *pAssetContract);
-                    std::unique_ptr<Account> pNewAccount(
-                        Account::GenerateNewAccount(NYM_ID, NOTARY_ID,
-                                                    server_->m_nymServer, MsgIn,
-                                                    Account::issuer));
+                    bool bSuccessLoadingInbox = theInbox.LoadInbox();
+                    bool bSuccessLoadingOutbox = theOutbox.LoadOutbox();
+                    // ...or generate them otherwise...
 
-                    // If we successfully create the account, then bundle it in
-                    // the message XML payload
-                    if (nullptr !=
-                        pNewAccount) // This last parameter generates an
-                                     // ISSUER account
-                    {                // instead of the default SIMPLE.
-                        String tempPayload(*pNewAccount);
-                        msgOut.m_ascPayload.SetString(tempPayload);
+                    if (true ==
+                        bSuccessLoadingInbox) // WEIRD IF THIS HAPPENED...
+                        bSuccessLoadingInbox = theInbox.VerifyAccount(
+                            server_->m_nymServer); // todo -- this should
+                                                    // NEVER
+                    // happen, the ID was just
+                    // RANDOMLY generated, so HOW did
+                    // the inbox already exist???
+                    else {
+                        bSuccessLoadingInbox = theInbox.GenerateLedger(
+                            theNewAccountID, NOTARY_ID, Ledger::inbox,
+                            true);
 
-                        // Attach the new account number to the outgoing
-                        // message.
-                        pNewAccount->GetIdentifier(msgOut.m_strAcctID);
-
-                        // Now that the account is actually created, let's add
-                        // the new asset contract
-                        // to the server's list.
-                        server_->transactor_.addAssetContract(
-                            *pAssetContract);              // Do NOT clean this
-                                                           // up unless failure!
-                                                           // Server will clean
-                                                           // it up.
-                        server_->mainFile_.SaveMainFile(); // So the main xml
-                                                           // file knows
-                                                           // to load
-                        // this instrument definition next time we run.
-
-                        // Make sure the contracts/%s file is created for next
-                        // time.
-                        pAssetContract->SaveContract(
-                            OTFolders::Contract().Get(), strFilename.Get());
-                        Identifier theNewAccountID;
-                        pNewAccount->GetIdentifier(theNewAccountID);
-                        Log::Output(
-                            0,
-                            "Generating inbox/outbox for new issuer acct. \n");
-
-                        Ledger theOutbox(NYM_ID, theNewAccountID, NOTARY_ID),
-                            theInbox(NYM_ID, theNewAccountID, NOTARY_ID);
-
-                        bool bSuccessLoadingInbox = theInbox.LoadInbox();
-                        bool bSuccessLoadingOutbox = theOutbox.LoadOutbox();
-                        // ...or generate them otherwise...
-
-                        if (true ==
-                            bSuccessLoadingInbox) // WEIRD IF THIS HAPPENED...
-                            bSuccessLoadingInbox = theInbox.VerifyAccount(
-                                server_->m_nymServer); // todo -- this should
-                                                       // NEVER
-                        // happen, the ID was just
-                        // RANDOMLY generated, so HOW did
-                        // the inbox already exist???
-                        else {
-                            bSuccessLoadingInbox = theInbox.GenerateLedger(
-                                theNewAccountID, NOTARY_ID, Ledger::inbox,
-                                true);
+                        if (bSuccessLoadingInbox) {
+                            bSuccessLoadingInbox =
+                                theInbox.SignContract(server_->m_nymServer);
 
                             if (bSuccessLoadingInbox) {
                                 bSuccessLoadingInbox =
-                                    theInbox.SignContract(server_->m_nymServer);
+                                    theInbox.SaveContract();
 
-                                if (bSuccessLoadingInbox) {
+                                if (bSuccessLoadingInbox)
                                     bSuccessLoadingInbox =
-                                        theInbox.SaveContract();
-
-                                    if (bSuccessLoadingInbox)
-                                        bSuccessLoadingInbox =
-                                            pNewAccount->SaveInbox(theInbox);
-                                }
+                                        pNewAccount->SaveInbox(theInbox);
                             }
-                        }
-                        if (true ==
-                            bSuccessLoadingOutbox) // WEIRD IF THIS HAPPENED....
-                            bSuccessLoadingOutbox = theOutbox.VerifyAccount(
-                                server_->m_nymServer); // todo -- this should
-                                                       // NEVER
-                        // happen, the ID was just
-                        // RANDOMLY generated, so HOW did
-                        // the outbox already exist???
-                        else {
-                            bSuccessLoadingOutbox = theOutbox.GenerateLedger(
-                                theNewAccountID, NOTARY_ID, Ledger::outbox,
-                                true);
-
-                            if (bSuccessLoadingOutbox) {
-                                bSuccessLoadingOutbox = theOutbox.SignContract(
-                                    server_->m_nymServer);
-
-                                if (bSuccessLoadingOutbox) {
-                                    bSuccessLoadingOutbox =
-                                        theOutbox.SaveContract();
-
-                                    if (bSuccessLoadingOutbox)
-                                        bSuccessLoadingOutbox =
-                                            pNewAccount->SaveOutbox(theOutbox);
-                                }
-                            }
-                        }
-                        if (!bSuccessLoadingInbox) {
-                            String strNewAcctID(theNewAccountID);
-
-                            Log::vError(
-                                "ERROR generating inbox ledger in "
-                                "UserCommandProcessor::"
-                                "UserCmdRegisterInstrumentDefinition:\n%"
-                                "s\n",
-                                strNewAcctID.Get());
-                        }
-                        else if (!bSuccessLoadingOutbox) {
-                            String strNewAcctID(theNewAccountID);
-
-                            Log::vError(
-                                "ERROR generating outbox ledger in "
-                                "UserCommandProcessor::"
-                                "UserCmdRegisterInstrumentDefinition:\n%"
-                                "s\n",
-                                strNewAcctID.Get());
-                        }
-                        else {
-                            msgOut.m_bSuccess = true; // <==== SUCCESS!!
-
-                            // On the server side, each nym stores a list of its
-                            // asset accounts (IDs).
-                            //
-                            std::set<std::string>& theAccountSet =
-                                theNym.GetSetAssetAccounts();
-                            theAccountSet.insert(msgOut.m_strAcctID.Get());
-
-                            theNym.SaveSignedNymfile(server_->m_nymServer);
-
-                            // TODO fire off a separate process here to create
-                            // the mint.
-                            //
-                            // THE PROGRAM ALREADY EXISTS (CreateMint) and you
-                            // can RUN IT BY HAND FOR NOW.
-                            // But in actual production environment, we'll
-                            // trigger that executable here,
-                            // and within a few minutes, users will be able to
-                            // getMint successfully (and
-                            // thus withdraw cash.)
                         }
                     }
-                    else
-                        Log::Error("Failure generating new issuer account in "
-                                   "UserCommandProcessor::"
-                                   "UserCmdRegisterInstrumentDefinition.\n");
+                    if (true == bSuccessLoadingOutbox) { // WEIRD IF THIS HAPPENED
+                        bSuccessLoadingOutbox = theOutbox.VerifyAccount(
+                            server_->m_nymServer); // todo -- this should NEVER
+                                                // happen, the ID was just
+                                                // RANDOMLY generated, so HOW did
+                                                // the outbox already exist???
+                    } else {
+                        bSuccessLoadingOutbox = theOutbox.GenerateLedger(
+                            theNewAccountID, NOTARY_ID, Ledger::outbox,
+                            true);
+
+                        if (bSuccessLoadingOutbox) {
+                            bSuccessLoadingOutbox = theOutbox.SignContract(
+                                server_->m_nymServer);
+
+                            if (bSuccessLoadingOutbox) {
+                                bSuccessLoadingOutbox =
+                                    theOutbox.SaveContract();
+
+                                if (bSuccessLoadingOutbox)
+                                    bSuccessLoadingOutbox =
+                                        pNewAccount->SaveOutbox(theOutbox);
+                            }
+                        }
+                    }
+                    if (!bSuccessLoadingInbox) {
+                        String strNewAcctID(theNewAccountID);
+
+                        Log::vError(
+                            "ERROR generating inbox ledger in "
+                            "UserCommandProcessor::"
+                            "UserCmdRegisterInstrumentDefinition:\n%"
+                            "s\n",
+                            strNewAcctID.Get());
+                    } else if (!bSuccessLoadingOutbox) {
+                        String strNewAcctID(theNewAccountID);
+
+                        Log::vError(
+                            "ERROR generating outbox ledger in "
+                            "UserCommandProcessor::"
+                            "UserCmdRegisterInstrumentDefinition:\n%"
+                            "s\n",
+                            strNewAcctID.Get());
+                    } else {
+                        msgOut.m_bSuccess = true; // <==== SUCCESS!!
+
+                        // On the server side, each nym stores a list of its
+                        // asset accounts (IDs).
+                        //
+                        std::set<std::string>& theAccountSet =
+                            theNym.GetSetAssetAccounts();
+                        theAccountSet.insert(msgOut.m_strAcctID.Get());
+
+                        theNym.SaveSignedNymfile(server_->m_nymServer);
+
+                        // TODO fire off a separate process here to create
+                        // the mint.
+                        //
+                        // THE PROGRAM ALREADY EXISTS (CreateMint) and you
+                        // can RUN IT BY HAND FOR NOW.
+                        // But in actual production environment, we'll
+                        // trigger that executable here,
+                        // and within a few minutes, users will be able to
+                        // getMint successfully (and
+                        // thus withdraw cash.)
+                    }
+                } else {
+                    Log::Error("Failure generating new issuer account in "
+                                "UserCommandProcessor::"
+                                "UserCmdRegisterInstrumentDefinition.\n");
                 }
-                else
-                    Log::Error("Failure verifying asset contract in "
-                               "UserCommandProcessor::"
-                               "UserCmdRegisterInstrumentDefinition.\n");
             }
-            else {
-                String strAssetNymID(ASSET_NYM_ID), strNymID;
-                theNym.GetIdentifier(strNymID);
-                Log::vError(
-                    "Nym ID on this user account (%s) does NOT match Nym ID "
-                    "for public key used in asset contract: %s\n",
-                    strNymID.Get(), strAssetNymID.Get());
-            }
-        }
-        else
-            Log::vError("%s: Failure loading asset contract from client.\n",
-                        __FUNCTION__);
-        if (pAssetContract && !msgOut.m_bSuccess) // We only clean it up here,
-                                                  // if the Server didn't take
-                                                  // ownership of it.
-        {
-            delete pAssetContract;
-            pAssetContract = nullptr;
         }
     }
 
     // Either way, we need to send the user's command back to him as well.
-    {
-        String tempInMessage(MsgIn);
-        msgOut.m_ascInReferenceTo.SetString(tempInMessage);
-    }
+    String tempInMessage(MsgIn);
+    msgOut.m_ascInReferenceTo.SetString(tempInMessage);
 
     // (2) Sign the Message
     msgOut.SignContract(server_->m_nymServer);
@@ -2423,18 +2253,16 @@ void UserCommandProcessor::UserCmdIssueBasket(Nym& theNym, Message& MsgIn,
     const Identifier NYM_ID(theNym), NOTARY_ID(server_->m_strNotaryID),
         NOTARY_NYM_ID(server_->m_nymServer);
 
-    String strBasket(MsgIn.m_ascPayload);
-    Basket theBasket;
+    auto serialized =
+        proto::DataToProto<proto::UnitDefinition>(MsgIn.m_ascPayload);
 
-    if (!theBasket.LoadContractFromString(strBasket)) {
-        Log::vError("%s: Failed trying to load basket from string.\n",
+    if (!serialized.has_type()) {
+        Log::vError("%s: Invalid unit definition.\n",
                     __FUNCTION__);
-    }
-    else if (!theBasket.VerifySignature(theNym)) {
-        Log::vError("%s: Failed verifying signature on basket.\n",
+    } else if (proto::UNITTYPE_BASKET != serialized.type()) {
+        Log::vError("%s: Not a basket contract.\n",
                     __FUNCTION__);
-    }
-    else {
+    } else {
         // The basket ID should be the same on all servers.
         // The basket contract ID will be unique on each server.
         //
@@ -2442,8 +2270,8 @@ void UserCommandProcessor::UserCmdIssueBasket(Nym& theNym, Message& MsgIn,
         // portion of the contract
         // (so it is unique on every server) and for the same reason with the
         // AccountID removed before calculating.
-        Identifier BASKET_ID, BASKET_ACCOUNT_ID, BASKET_CONTRACT_ID;
-        theBasket.CalculateContractID(BASKET_ID);
+        Identifier BASKET_ACCOUNT_ID, BASKET_CONTRACT_ID;
+        Identifier BASKET_ID = BasketContract::CalculateBasketID(serialized);
 
         // Use BASKET_ID to look up the Basket account and see if it already
         // exists (the server keeps a list.)
@@ -2474,23 +2302,20 @@ void UserCommandProcessor::UserCmdIssueBasket(Nym& theNym, Message& MsgIn,
             //
             bool bSubCurrenciesAllExist = true;
 
-            for (int32_t i = 0; i < theBasket.Count(); i++) {
-                BasketItem* pItem = theBasket.At(i);
-                OT_ASSERT(nullptr != pItem);
-
-                if (nullptr ==
-                    server_->transactor_.getAssetContract(
-                        pItem->SUB_CONTRACT_ID)) // Sub-currency
-                                                 // not found.
+            for (auto& it : serialized.basket().item()) {
+                std::string subcontractID = it.unit();
+                auto pContract =
+                    App::Me().Contract().UnitDefinition(subcontractID);
+                if (!pContract)
                 {
-                    const String strSubID(pItem->SUB_CONTRACT_ID);
                     Log::vError("%s: Failed: Sub-currency for basket is not "
                                 "issued on this server: %s\n",
-                                __FUNCTION__, strSubID.Get());
+                                __FUNCTION__, subcontractID.c_str());
                     bSubCurrenciesAllExist = false;
                     break;
                 }
             }
+            bool accountsReady = false;
             // By this point we know that the basket currency itself does NOT
             // already exist (good.)
             // We also know that all the subcurrencies DO already exist (good.)
@@ -2510,35 +2335,28 @@ void UserCommandProcessor::UserCmdIssueBasket(Nym& theNym, Message& MsgIn,
                 // (which formerly was blank, from the client.)
                 // This loop also adds the BASKET_ID and the NEW ACCOUNT ID to a
                 // map on the server for later reference.
-                for (int32_t i = 0; i < theBasket.Count(); i++) {
-                    BasketItem* pItem = theBasket.At(i);
-                    OT_ASSERT(nullptr != pItem);
 
-                    Account* pNewAccount = nullptr;
+                for (auto& it : *serialized.mutable_basket()->mutable_item()) {
+                    std::unique_ptr<Account> pNewAccount;
 
                     // GenerateNewAccount expects the Instrument Definition Id
                     // to be in MsgIn.
                     // So we'll just put it there to make things easy...
                     //
-                    pItem->SUB_CONTRACT_ID.GetString(
-                        MsgIn.m_strInstrumentDefinitionID);
+                    MsgIn.m_strInstrumentDefinitionID = it.unit();
 
-                    pNewAccount = Account::GenerateNewAccount(
+                    pNewAccount.reset(Account::GenerateNewAccount(
                         NOTARY_NYM_ID, NOTARY_ID, server_->m_nymServer, MsgIn,
-                        Account::basketsub);
+                        Account::basketsub));
 
                     // If we successfully create the account, then bundle it
                     // in the message XML payload
                     //
                     if (nullptr != pNewAccount) {
-                        msgOut.m_bSuccess = true;
-
-                        // Now the item finally has its account ID. Let's grab
-                        // it.
-                        pNewAccount->GetIdentifier(pItem->SUB_ACCOUNT_ID);
-
-                        delete pNewAccount;
-                        pNewAccount = nullptr;
+                        String newAccountID;
+                        pNewAccount->GetIdentifier(newAccountID);
+                        it.set_account(newAccountID.Get());
+                        accountsReady = true;
                     }
                     else {
                         Log::vError("%s: Failed while calling: "
@@ -2546,84 +2364,66 @@ void UserCommandProcessor::UserCmdIssueBasket(Nym& theNym, Message& MsgIn,
                                     "NYM_ID, NOTARY_ID, m_nymServer, "
                                     "MsgIn, OTAccount::basketsub)\n",
                                     __FUNCTION__);
-                        msgOut.m_bSuccess = false;
+                        accountsReady = false;
                         break;
                     }
                 } // for
 
+                std::shared_ptr<const UnitDefinition> contract;
+
+                if (accountsReady) {
+                    bool finalized = false;
+                    auto nym = App::Me().Contract().Nym(NOTARY_NYM_ID);
+
+                    if (nym) {
+                        finalized =
+                            BasketContract::FinalizeTemplate(nym, serialized);
+                    }
+
+                    if (finalized) {
+                        if (proto::UNITTYPE_BASKET == serialized.type()) {
+                            contract =
+                                App::Me().Contract().UnitDefinition(serialized);
+
+                            if (contract) {
+                                BASKET_CONTRACT_ID = contract->ID();
+                                msgOut.m_bSuccess = true;
+                            } else {
+                                otOut << __FUNCTION__ << ": Failed to construct"
+                                << " basket contract object." << std::endl;
+
+                                msgOut.m_bSuccess = false;
+                            }
+                        } else {
+                            otOut << __FUNCTION__ << ": Not a"
+                            << " basket contract object." << std::endl;
+
+                            msgOut.m_bSuccess = false;
+                        }
+                    } else {
+                        otOut << __FUNCTION__ << ": Failed to finalize"
+                        << " basket contract object." << std::endl;
+
+                        msgOut.m_bSuccess = false;
+                    }
+                } else {
+                    otOut << __FUNCTION__ << ": Failed to create"
+                    << " basket contract sub-accounts." << std::endl;
+
+                    msgOut.m_bSuccess = false;
+                }
+
                 if (true == msgOut.m_bSuccess) {
-                    // Generate a new OTAssetContract -- the ID will be a hash
-                    // of THAT contract, which includes theBasket as well as
-                    // the server's public key as part of its contents.
-                    // Therefore, the actual Instrument Definition ID of the
-                    // basket
-                    // currency
-                    // will be different from server to server.
-                    //
-                    // BUT!! Because we can also generate a hash of
-                    // theBasket.m_xmlUnsigned (which is what
-                    // Basket::CalculateContractID
-                    // does) then we have a way of obtaining a number that will
-                    // be the same from server to server, for cross-server
-                    // transfers of basket assets.
-                    //
-                    // The way it will work is, when the cross-server transfer
-                    // request is generated, the server will check the asset
-                    // contract
-                    // for the "from" account and see if it is for a basket
-                    // currency. If it is, there will be a function on the
-                    // contract
-                    // that returns the Basket ID, which can be included in the
-                    // message to the target server, which uses the ID to look
-                    // for its own basket issuer account for the same basket
-                    // instrument definition. This allows the target server to
-                    // translate
-                    // the
-                    // Instrument Definition ID to its own corresponding ID for
-                    // the same
-                    // basket.
-                    theBasket.ReleaseSignatures();
-                    theBasket.SignContract(server_->m_nymServer);
-                    theBasket.SaveContract();
-
-                    // The basket does not yet exist on this server. Create a
-                    // new Asset Contract to support it...
-
-                    // Put the Server's Public Key into the "contract" key field
-                    // of the new Asset Contract...
-                    // This adds a "contract" key to the asset contract (the
-                    // server's public key)
-                    // Asset Contracts are verified by a key found internal to
-                    // the contract, so it's
-                    // necessary to put the key in there so it will verify
-                    // later.
-                    // This also updates the m_xmlUnsigned contents, signs the
-                    // contract, saves it,
-                    // and calculates the new ID.
-                    AssetContract* pBasketContract =
-                        new BasketContract(theBasket, server_->m_nymServer);
 
                     // Grab the new instrument definition id for the new basket
                     // currency
-                    pBasketContract->GetIdentifier(BASKET_CONTRACT_ID);
-                    String STR_BASKET_CONTRACT_ID(BASKET_CONTRACT_ID);
+                    String STR_BASKET_CONTRACT_ID = contract->ID();
 
                     // set the new Instrument Definition ID, aka ContractID,
                     // onto the
                     // outgoing message.
                     msgOut.m_strInstrumentDefinitionID = STR_BASKET_CONTRACT_ID;
 
-                    // Save the new Asset Contract to disk
-                    const String strFoldername(OTFolders::Contract().Get()),
-                        strFilename(STR_BASKET_CONTRACT_ID.Get());
-
-                    // Save the new basket contract to the contracts folder
-                    // (So the users can use it the same as they would use any
-                    // other contract.)
-                    pBasketContract->SaveContract(strFoldername.Get(),
-                                                  strFilename.Get());
-
-                    server_->transactor_.addAssetContract(*pBasketContract);
                     // I don't save this here. Instead, I wait for
                     // AddBasketAccountID and then I call SaveMainFile after
                     // that. See below.
@@ -2687,12 +2487,18 @@ void UserCommandProcessor::UserCmdIssueBasket(Nym& theNym, Message& MsgIn,
                         pBasketAccount = nullptr;
                     }
                     else {
+                        otOut << __FUNCTION__ << ": Failed to instantiate"
+                        << " basket account." << std::endl;
+
                         msgOut.m_bSuccess = false;
                     }
 
                 } // if true == msgOut.m_bSuccess
-            }     // Subcurrencies all do exist.
-        }         // basket doesn't already exist (creating it)
+            } else {
+                otOut << __FUNCTION__ << ": missing sub-currencies."
+                      << std::endl;
+            }
+        }
     }
 
     // (2) Sign the Message
@@ -2729,17 +2535,17 @@ void UserCommandProcessor::UserCmdRegisterAccount(Nym& theNym, Message& MsgIn,
     // payload
     if (nullptr != pNewAccount) {
         const char* szFunc = "UserCommandProcessor::UserCmdRegisterAccount";
-        AssetContract* pContract = server_->transactor_.getAssetContract(
+        auto pContract = App::Me().Contract().UnitDefinition(
             pNewAccount->GetInstrumentDefinitionID());
 
-        if (nullptr == pContract) {
+        if (!pContract) {
             const String strInstrumentDefinitionID(
                 pNewAccount->GetInstrumentDefinitionID());
-            Log::vError("%s: Error: Unable to get AssetContract for "
+            Log::vError("%s: Error: Unable to get UnitDefinition for "
                         "instrument definition: %s\n",
                         szFunc, strInstrumentDefinitionID.Get());
         }
-        else if (pContract->IsShares()) {
+        else if (pContract->Type() == proto::UNITTYPE_SECURITY) {
             // The instrument definition keeps a list of all accounts for that
             // type.
             // (For shares, not for currencies.)
@@ -3118,11 +2924,8 @@ void UserCommandProcessor::UserCmdQueryInstrumentDefinitions(Nym&,
                 if ((str1.size() > 0) &&
                     (str2.compare("exists") == 0)) // todo hardcoding
                 {
-                    const Identifier theInstrumentDefinitionID(str1.c_str());
-                    AssetContract* pAssetContract =
-                        server_->transactor_.getAssetContract(
-                            theInstrumentDefinitionID);
-                    if (nullptr != pAssetContract) // Yes, it exists.
+                    auto pContract = App::Me().Contract().UnitDefinition(str1);
+                    if (pContract) // Yes, it exists.
                         theNewMap[str1] = "true";
                     else
                         theNewMap[str1] = "false";
@@ -3177,17 +2980,16 @@ void UserCommandProcessor::UserCmdGetInstrumentDefinition(Message& MsgIn,
     const Identifier INSTRUMENT_DEFINITION_ID(
         MsgIn.m_strInstrumentDefinitionID);
 
-    AssetContract* pContract =
-        server_->transactor_.getAssetContract(INSTRUMENT_DEFINITION_ID);
-
-    bool bSuccessLoadingContract = ((pContract != nullptr) ? true : false);
+    auto pContract =
+        App::Me().Contract().UnitDefinition(INSTRUMENT_DEFINITION_ID);
 
     // Yup the asset contract exists.
-    if (bSuccessLoadingContract) {
+    if (pContract) {
         msgOut.m_bSuccess = true;
-        // extract the account in ascii-armored form on the outgoing message
-        String strPayload(*pContract); // first grab it in plaintext string form
-        msgOut.m_ascPayload.SetString(strPayload); // now the outgoing message
+        OTData serialized =
+            proto::ProtoAsData<proto::UnitDefinition>
+                (pContract->PublicContract());
+        msgOut.m_ascPayload.SetData(serialized); // now the outgoing message
                                                    // has the contract in its
                                                    // payload in base64 form.
     }
@@ -3844,17 +3646,17 @@ void UserCommandProcessor::UserCmdDeleteAssetAcct(Nym& theNym, Message& MsgIn,
             theAccountSet.erase(MsgIn.m_strAcctID.Get());
 
             theNym.SaveSignedNymfile(server_->m_nymServer);
-            AssetContract* pContract = server_->transactor_.getAssetContract(
+            auto pContract = App::Me().Contract().UnitDefinition(
                 pAccount->GetInstrumentDefinitionID());
 
-            if (nullptr == pContract) {
+            if (!pContract) {
                 const String strInstrumentDefinitionID(
                     pAccount->GetInstrumentDefinitionID());
-                Log::vError("%s: Error: Unable to get AssetContract for "
+                Log::vError("%s: Error: Unable to get UnitDefinition for "
                             "instrument definition: %s\n",
                             szFunc, strInstrumentDefinitionID.Get());
             }
-            else if (pContract->IsShares()) {
+            else if (pContract->Type() == proto::UNITTYPE_SECURITY) {
                 // The instrument definition keeps a list of all accounts for
                 // that type.
                 // (For shares, not for currencies.)

@@ -51,7 +51,7 @@ namespace opentxs
 {
 
 class Account;
-class AssetContract;
+class UnitDefinition;
 class Contract;
 class Identifier;
 class Message;
@@ -59,14 +59,11 @@ class OTPassword;
 class OTPasswordData;
 class Nym;
 class Purse;
-class ServerContract;
 class String;
 class OTSymmetricKey;
 
 typedef std::map<std::string, Account*> mapOfAccounts;
-typedef std::map<std::string, AssetContract*> mapOfContracts;
 typedef std::map<std::string, Nym*> mapOfNyms;
-typedef std::map<std::string, ServerContract*> mapOfServers;
 typedef std::map<std::string, std::shared_ptr<OTSymmetricKey>>
     mapOfSymmetricKeys;
 typedef std::set<Identifier> setOfIdentifiers;
@@ -82,24 +79,12 @@ public:
                                                                   // haystack.
     EXPORT bool ConvertNymToCachedKey(Nym& theNym);
 
-    EXPORT Nym* GetOrLoadNym(const Identifier& NYM_ID, bool bChecking = false,
-                             const char* szFuncName = nullptr,
-                             const OTPasswordData* pPWData = nullptr);
-    EXPORT Nym* GetOrLoadPublicNym(const Identifier& NYM_ID,
-                                   const char* szFuncName = nullptr,
-                                   bool bChecking=false);
     EXPORT Nym* GetOrLoadPrivateNym(
         const Identifier& NYM_ID, bool bChecking = false,
         const char* szFuncName = nullptr,
         const OTPasswordData* pPWData = nullptr,
         const OTPassword* pImportPassword = nullptr);
 
-    EXPORT Nym* reloadAndGetNym(const Identifier& NYM_ID, bool bChecking = false,
-                                const char* szFuncName = nullptr,
-                                const OTPasswordData* pPWData = nullptr);
-    EXPORT Nym* reloadAndGetPublicNym(const Identifier& NYM_ID,
-                                      const char* szFuncName = nullptr,
-                                      bool bChecking=false);
     EXPORT Nym* reloadAndGetPrivateNym(
         const Identifier& NYM_ID, bool bChecking = false,
         const char* szFuncName = nullptr,
@@ -117,40 +102,21 @@ public:
     // Used by high-level wrapper.
 
     EXPORT int32_t GetNymCount();
-    EXPORT int32_t GetServerCount();
-    EXPORT int32_t GetAssetTypeCount();
     EXPORT int32_t GetAccountCount();
     EXPORT Nym * CreateNym(const NymParameters& nymParameters);
     EXPORT bool GetNym(int32_t iIndex, Identifier& NYM_ID, String& NYM_NAME);
-    EXPORT bool GetServer(int32_t iIndex, Identifier& THE_ID, String& THE_NAME);
-    EXPORT bool GetAssetType(int32_t iIndex, Identifier& THE_ID,
-                             String& THE_NAME);
     EXPORT bool GetAccount(int32_t iIndex, Identifier& THE_ID,
                            String& THE_NAME);
 
     EXPORT void DisplayStatistics(String& strOutput);
 
-    EXPORT Nym* GetNymByID(const Identifier& NYM_ID);
     EXPORT Nym* GetPrivateNymByID(const Identifier& NYM_ID);
-    EXPORT Nym* GetPublicNymByID(const Identifier& NYM_ID);
     EXPORT Nym* GetNymByIDPartialMatch(std::string PARTIAL_ID); // wallet name
                                                                 // for nym also
                                                                 // accepted.
-
-    EXPORT void AddServerContract(ServerContract* theContract); //takes ownership
-    EXPORT ServerContract* GetServerContract(const Identifier& NOTARY_ID);
-    EXPORT ServerContract* GetServerContractPartialMatch(
-        std::string PARTIAL_ID); // wallet name for server also accepted.
-
     EXPORT void AddPrivateNym(const Nym& theNym);
-    EXPORT void AddPublicNym(const Nym& theNym);
-    EXPORT void AddNym(const Nym& theNym);
     EXPORT void AddAccount(const Account& theAcct);
 
-    EXPORT void AddAssetContract(const AssetContract& theContract);
-    EXPORT AssetContract* GetAssetContract(const Identifier& theContractID);
-    EXPORT AssetContract* GetAssetContractPartialMatch(
-        std::string PARTIAL_ID); // wallet name for asset also accepted.
     bool VerifyAssetAccount(const Nym& theNym, Account& theAcct,
                             const Identifier& NOTARY_ID,
                             const String& strAcctID,
@@ -224,10 +190,6 @@ public:
     // and they don't save the wallet after they do.
     //
     // (You have to handle that at a higher level.)
-
-    EXPORT bool RemoveAssetContract(const Identifier& theTargetID);
-    EXPORT bool RemoveServerContract(const Identifier& theTargetID);
-
     // higher level version of these two will require a server message,
     // in addition to removing from wallet. (To delete them on server side.)
     //
@@ -235,8 +197,6 @@ public:
     EXPORT bool RemovePrivateNym(const Identifier& theTargetID,
                                  bool bRemoveFromCachedKey=true,
                                  String * pStrOutputName=nullptr);
-    EXPORT bool RemovePublicNym(const Identifier& theTargetID,
-                                String * pStrOutputName=nullptr);
     EXPORT std::string GetHDWordlist() const;
 
 private:
@@ -248,9 +208,6 @@ private:
 
 private:
     mapOfNyms m_mapPrivateNyms;
-    mapOfNyms m_mapPublicNyms;
-    mapOfContracts m_mapContracts;
-    mapOfServers m_mapServers;
     mapOfAccounts m_mapAccounts;
 
     setOfIdentifiers m_setNymsOnCachedKey; // All the Nyms that use the Master

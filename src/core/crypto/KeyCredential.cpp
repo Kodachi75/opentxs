@@ -327,6 +327,7 @@ std::shared_ptr<OTKeypair> KeyCredential::DeriveHDKeypair(
     const proto::KeyRole role)
 {
     proto::HDPath keyPath;
+    keyPath.set_version(1);
     keyPath.add_child(NYM_PURPOSE | HARDENED);
     keyPath.add_child(nym | HARDENED);
     keyPath.add_child(credset | HARDENED);
@@ -346,15 +347,20 @@ std::shared_ptr<OTKeypair> KeyCredential::DeriveHDKeypair(
             break;
     }
 
-    serializedAsymmetricKey privateKey =
-        App::Me().Crypto().BIP32().GetHDKey(keyPath);
-    privateKey->set_role(role);
+    std::shared_ptr<OTKeypair> newKeypair;
+    auto privateKey = App::Me().Crypto().BIP32().GetHDKey(keyPath);
 
-    serializedAsymmetricKey publicKey = App::Me().Crypto().BIP32().PrivateToPublic(*privateKey);
+    if (privateKey) {
 
-    std::shared_ptr<OTKeypair> newKeypair = std::make_shared<OTKeypair>(
-        *publicKey,
-        *privateKey);
+        privateKey->set_role(role);
+        auto publicKey = App::Me().Crypto().BIP32().PrivateToPublic(*privateKey);
+
+        if (publicKey) {
+            newKeypair = std::make_shared<OTKeypair>(
+                *publicKey,
+                *privateKey);
+        }
+    }
 
     return newKeypair;
 }
@@ -410,7 +416,7 @@ bool KeyCredential::addKeytoSerializedKeyCredential(
     const proto::KeyRole role) const
 {
     serializedAsymmetricKey key;
-    std::shared_ptr<OTKeypair>(pKey);
+    std::shared_ptr<OTKeypair> pKey;
 
     switch (role) {
         case proto::KEYROLE_AUTH :
@@ -426,10 +432,15 @@ bool KeyCredential::addKeytoSerializedKeyCredential(
             return false;
     }
 
+    if (!pKey) { return false; }
+
     key = pKey->Serialize(getPrivate);
+
+    if (!key) { return false; }
+
     key->set_role(role);
 
-    proto::AsymmetricKey* newKey = credential.add_key();
+    auto newKey = credential.add_key();
     *newKey = *key;
 
     return true;
@@ -492,13 +503,23 @@ bool KeyCredential::Sign(
             return false;
     }
 
-    return keyToUse->Sign(plaintext, ID(), sig, pPWData, exportPassword, role);
+    if (nullptr != keyToUse) {
+        return keyToUse->Sign(
+            plaintext,
+            ID(),
+            sig,
+            pPWData,
+            exportPassword,
+            role);
+    }
+
+    return false;
 }
 
 bool KeyCredential::Verify(
     const OTData& plaintext,
-    proto::Signature& sig,
-    proto::KeyRole key) const
+    const proto::Signature& sig,
+    const proto::KeyRole key) const
 {
     const OTKeypair* keyToUse = nullptr;
 

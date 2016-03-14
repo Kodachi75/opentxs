@@ -21,7 +21,6 @@ include_directories(
 add_subdirectory(storage)
 add_subdirectory(core)
 add_subdirectory(cash)
-add_subdirectory(basket)
 add_subdirectory(ext)
 add_subdirectory(network)
 add_subdirectory(client)

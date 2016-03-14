@@ -43,7 +43,7 @@
 
 #include <opentxs/core/Log.hpp>
 
-#include <opentxs/basket/Basket.hpp>
+#include <opentxs/core/contract/basket/Basket.hpp>
 
 #include <irrxml/irrXML.hpp>
 

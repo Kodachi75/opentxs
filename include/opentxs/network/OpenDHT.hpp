@@ -61,7 +61,7 @@ private:
     static OpenDHT* instance_;
 
     DhtConfig config_;
-    dht::DhtRunner* node_ = nullptr;
+    std::unique_ptr<dht::DhtRunner> node_ = nullptr;
 
     OpenDHT(DhtConfig& config);
     OpenDHT() = delete;

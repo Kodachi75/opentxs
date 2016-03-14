@@ -129,15 +129,15 @@ public:
     // Merchant Nym is passed here so we can
     // verify the signature before confirming.
     EXPORT bool Confirm(Nym& PAYER_NYM, Account& PAYER_ACCT,
-                        Nym* pMERCHANT_NYM = nullptr,
+                        const Nym* pMERCHANT_NYM = nullptr,
                         const Identifier* p_id_MERCHANT_NYM = nullptr);
 
     // What should be the process here?
 
     /*
         FIRST: (Construction)
-     
-     OTAgreement(const OTIdentifier& NOTARY_ID,            
+
+     OTAgreement(const OTIdentifier& NOTARY_ID,
                  const OTIdentifier& INSTRUMENT_DEFINITION_ID);
        OR:
      OTAgreement(const OTIdentifier& NOTARY_ID, const OTIdentifier& INSTRUMENT_DEFINITION_ID,
@@ -153,7 +153,7 @@ public:
 
      bool bSuccessSetAgreement = pPlan->SetAgreement(lTransactionNumber,
                                                     PLAN_CONSIDERATION, VALID_FROM, VALID_TO);
-     
+
      THEN, (OTPaymentPlan) adds TWO OPTIONS (additional and independent of each other):
 
      bool        SetInitialPayment(const int64_t& lAmount, time64_t

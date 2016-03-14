@@ -92,7 +92,7 @@ void OpenDHT::Insert(
 
     pValue->user_type = key;
 
-    if (nullptr != node_) {
+    if (node_) {
         node_->put(infoHash, pValue, cb);
     }
 }
@@ -103,7 +103,7 @@ void OpenDHT::Retrieve(
     dht::Dht::DoneCallbackSimple dcb,
     dht::Value::Filter f)
 {
-    if (nullptr != node_) {
+    if (node_) {
         node_->get(key, vcb, dcb, f);
     }
 }
@@ -111,6 +111,7 @@ void OpenDHT::Retrieve(
 void OpenDHT::Cleanup()
 {
     node_->join();
+    instance_ = nullptr;
 }
 
 OpenDHT::~OpenDHT()

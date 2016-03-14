@@ -86,6 +86,7 @@ void MessageProcessor::init(int port, zcert_t* transportKey)
     zsock_set_zap_domain(zmqSocket_, "global");
     zsock_set_curve_server(zmqSocket_, 1);
     zcert_apply(transportKey, zmqSocket_);
+    zcert_destroy(&transportKey);
     zsock_bind(zmqSocket_, "tcp://*:%d", port);
 }
 
@@ -114,9 +115,9 @@ void MessageProcessor::run()
 
         if (!zpoller_expired(zmqPoller_)) {
             otErr << __FUNCTION__ << ": zpoller_wait error\n";
-            // we do not want busy loop if something goes wrong
-            Log::Sleep(std::chrono::milliseconds(100));
         }
+
+        Log::Sleep(std::chrono::milliseconds(100));
     }
 }
 

@@ -1863,8 +1863,8 @@ bool OT_ME::Register_API_With_Script_Chai(const OTScriptChai& theScript) const
                             "OT_API_SymmetricEncrypt");
         theScript.chai->add(fun(&OTAPI_Wrap::SymmetricDecrypt),
                             "OT_API_SymmetricDecrypt");
-        theScript.chai->add(fun(&OTAPI_Wrap::CreateAssetContract),
-                            "OT_API_CreateAssetContract");
+        theScript.chai->add(fun(&OTAPI_Wrap::CreateCurrencyContract),
+                            "OT_API_CreateCurrencyContract");
         theScript.chai->add(fun(&OTAPI_Wrap::GetServer_Contract),
                             "OT_API_GetServer_Contract");
         theScript.chai->add(fun(&OTAPI_Wrap::GetAssetType_Contract),
@@ -1932,8 +1932,8 @@ bool OT_ME::Register_API_With_Script_Chai(const OTScriptChai& theScript) const
 
         theScript.chai->add(fun(&OTAPI_Wrap::AddServerContract),
                             "OT_API_AddServerContract");
-        theScript.chai->add(fun(&OTAPI_Wrap::AddAssetContract),
-                            "OT_API_AddAssetContract");
+        theScript.chai->add(fun(&OTAPI_Wrap::AddUnitDefinition),
+                            "OT_API_AddUnitDefinition");
         theScript.chai->add(fun(&OTAPI_Wrap::GetServerCount),
                             "OT_API_GetServerCount");
         theScript.chai->add(fun(&OTAPI_Wrap::GetAssetTypeCount),
@@ -2096,8 +2096,6 @@ bool OT_ME::Register_API_With_Script_Chai(const OTScriptChai& theScript) const
                             "OT_API_VerifyUserPrivateKey");
         theScript.chai->add(fun(&OTAPI_Wrap::LoadPurse), "OT_API_LoadPurse");
         theScript.chai->add(fun(&OTAPI_Wrap::LoadMint), "OT_API_LoadMint");
-        theScript.chai->add(fun(&OTAPI_Wrap::LoadAssetContract),
-                            "OT_API_LoadAssetContract");
         theScript.chai->add(fun(&OTAPI_Wrap::LoadServerContract),
                             "OT_API_LoadServerContract");
         theScript.chai->add(fun(&OTAPI_Wrap::Mint_IsStillGood),

@@ -468,8 +468,15 @@ public:
     // This function will also ADD the contract to the wallet.
     // Returns: the new contract ID, or nullptr if failure.
     */
-    EXPORT static std::string CreateAssetContract(
-        const std::string& NYM_ID, const std::string& strXMLcontents);
+    EXPORT static std::string CreateCurrencyContract(
+        const std::string& NYM_ID,
+        const std::string& shortname,
+        const std::string& terms,
+        const std::string& name,
+        const std::string& symbol,
+        const std::string& tla,
+        const uint32_t power,
+        const std::string& fraction);
 
     // Use these below functions to get the new contract ITSELF, using its ID
     // that was returned by the above two functions:
@@ -480,10 +487,6 @@ public:
     // INSTRUMENT_DEFINITION_ID); // Returns currency contract based on Asset
     // Type ID
 
-    EXPORT static std::string CalculateAssetContractID(
-        const std::string& str_Contract);
-    EXPORT static std::string CalculateServerContractID(
-        const std::string& str_Contract);
     EXPORT static std::string CalculateContractID(
         const std::string& str_Contract);
 
@@ -571,7 +574,7 @@ public:
     // If you have a server contract that you'd like to add
     // to your wallet, call this function.
     */
-    EXPORT static int32_t AddServerContract(
+    EXPORT static std::string AddServerContract(
         const std::string& strContract); // returns OT_TRUE (1) or OT_FALSE(0)
 
     /** --------------------------------------------------
@@ -580,7 +583,7 @@ public:
     // If you have an asset contract that you'd like to add
     // to your wallet, call this function.
     */
-    EXPORT static int32_t AddAssetContract(
+    EXPORT static std::string AddUnitDefinition(
         const std::string& strContract); // returns OT_TRUE (1) or OT_FALSE(0)
 
     /** --------------------------------------------------
@@ -613,7 +616,6 @@ public:
         const std::string& NOTARY_ID); // Return's Server's contract (based on
                                        // server ID)
 
-    int32_t GetCurrencyFactor(const std::string& INSTRUMENT_DEFINITION_ID);
     int32_t GetCurrencyDecimalPower(
         const std::string& INSTRUMENT_DEFINITION_ID);
 
@@ -1840,11 +1842,6 @@ public:
         const std::string& INSTRUMENT_DEFINITION_ID); // returns nullptr, or a
                                                       // mint
 
-    EXPORT static std::string LoadAssetContract(
-        const std::string& INSTRUMENT_DEFINITION_ID); // returns nullptr, or an
-                                                      // asset
-                                                      // contract.
-
     EXPORT static std::string LoadServerContract(
         const std::string& NOTARY_ID); // returns nullptr, or a server contract.
 
@@ -3040,9 +3037,12 @@ public:
     // issueBasket to send the request to the server.
     */
     EXPORT static std::string GenerateBasketCreation(
-        const std::string& NYM_ID,
-        const int64_t& MINIMUM_TRANSFER // If basket is X=2,3,4, then this is X.
-        );
+        const std::string& nymID,
+        const std::string& shortname,
+        const std::string& name,
+        const std::string& symbol,
+        const std::string& terms,
+        const uint64_t weight);
 
     /** ----------------------------------------------------
     // ADD BASKET CREATION ITEM
@@ -3055,15 +3055,9 @@ public:
     // to send the request to the server.
     */
     EXPORT static std::string AddBasketCreationItem(
-        const std::string& NYM_ID,                   // for signature.
-        const std::string& THE_BASKET,               // created in above call.
-        const std::string& INSTRUMENT_DEFINITION_ID, // Adding an instrument
-                                                     // definition to
-                                                     // the new
-                                                     // basket.
-        const int64_t& MINIMUM_TRANSFER // If basket is 5=X,X,X then this is an
-                                        // X.
-        );
+        const std::string& basketTemplate,
+        const std::string& currencyID,
+        const uint64_t& weight);
 
     /**
     --------------------------------------------------------------------------

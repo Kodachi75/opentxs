@@ -31,6 +31,7 @@ set(cxx-sources
   app/App.cpp
   app/Dht.cpp
   app/Settings.cpp
+  app/Wallet.cpp
   util/Tag.cpp
   util/Timer.cpp
   util/Assert.cpp
@@ -43,7 +44,13 @@ set(cxx-sources
   Account.cpp
   AccountList.cpp
   crypto/OTASCIIArmor.cpp
-  AssetContract.cpp
+  contract/UnitDefinition.cpp
+  contract/CurrencyContract.cpp
+  contract/SecurityContract.cpp
+  contract/Signable.cpp
+  contract/basket/Basket.cpp
+  contract/basket/BasketContract.cpp
+  contract/basket/BasketItem.cpp
   crypto/BitcoinCrypto.cpp
   crypto/OTAsymmetricKey.cpp
   crypto/OTAsymmetricKeyOpenSSL.cpp
@@ -98,6 +105,7 @@ set(cxx-sources
   OTTransactionType.cpp
   NymIDSource.cpp
   crypto/Bip32.cpp
+  crypto/Bip39.cpp
   crypto/PaymentCode.cpp
   crypto/ContactCredential.cpp
   crypto/VerificationCredential.cpp

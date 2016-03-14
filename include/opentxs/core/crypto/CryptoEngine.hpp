@@ -39,6 +39,8 @@
 #ifndef OPENTXS_CORE_CRYPTO_CRYPTOENGINE_HPP
 #define OPENTXS_CORE_CRYPTO_CRYPTOENGINE_HPP
 
+#include <memory>
+
 #include <opentxs/core/crypto/Bip39.hpp>
 #include <opentxs/core/crypto/Bip32.hpp>
 #include <opentxs/core/crypto/CryptoAsymmetric.hpp>
@@ -87,12 +89,12 @@ private:
     CryptoEngine(const CryptoEngine&) = delete;
     CryptoEngine& operator=(const CryptoEngine&) = delete;
     void Init();
-    SSLImplementation* pSSL_ = nullptr;
+    std::unique_ptr<SSLImplementation> pSSL_;
 #ifdef OT_CRYPTO_SUPPORTED_KEY_SECP256K1
-    secp256k1* psecp256k1_ = nullptr;
+    std::unique_ptr<secp256k1> psecp256k1_;
 #endif
 #ifdef OT_CRYPTO_USING_TREZOR
-    bitcoincrypto* pbitcoincrypto_ = nullptr;
+    std::unique_ptr<bitcoincrypto> pbitcoincrypto_;
 #endif
     static CryptoEngine* pInstance_;
 

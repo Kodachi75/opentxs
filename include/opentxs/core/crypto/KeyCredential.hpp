@@ -157,8 +157,8 @@ public:
     using ot_super::Verify;
     bool Verify(
         const OTData& plaintext,
-        proto::Signature& sig,
-        proto::KeyRole key = proto::KEYROLE_SIGN) const override;
+        const proto::Signature& sig,
+        const proto::KeyRole key = proto::KEYROLE_SIGN) const override;
     EXPORT virtual bool VerifySig(
         const proto::Signature& sig,
         const OTAsymmetricKey& theKey,

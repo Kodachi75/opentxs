@@ -39,6 +39,8 @@
 #ifndef OPENTXS_CORE_OTSETTINGS_HPP
 #define OPENTXS_CORE_OTSETTINGS_HPP
 
+#include <memory>
+
 #include <opentxs/core/String.hpp>
 
 namespace opentxs
@@ -51,7 +53,7 @@ private:
     Settings& operator=(const Settings&) = delete;
 
     class SettingsPvt;
-    SettingsPvt* pvt = nullptr;
+    std::unique_ptr<SettingsPvt> pvt_;
 
     bool b_Loaded;
 

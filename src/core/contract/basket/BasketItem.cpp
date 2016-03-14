@@ -36,29 +36,10 @@
  *
  ************************************************************/
 
-#ifndef OPENTXS_NETWORK_DHTCONFIG_HPP
-#define OPENTXS_NETWORK_DHTCONFIG_HPP
+#include <opentxs/core/stdafx.hpp>
 
-#include <string>
+#include <opentxs/core/contract/basket/BasketItem.hpp>
 
 namespace opentxs
 {
-
-class DhtConfig
-{
-public:
-    int64_t default_server_port_ = 4222;
-    int64_t default_client_port_ = 4223;
-    int64_t listen_port_ = 4222;
-    int64_t nym_publish_interval_ = 60 * 60 * 1;
-    int64_t nym_refresh_interval_ = 60 * 60 * 1;
-    int64_t server_publish_interval_ = 60 * 60 * 1;
-    int64_t server_refresh_interval_ = 60 * 60 * 1;
-    int64_t unit_publish_interval_ = 60 * 60 * 1;
-    int64_t unit_refresh_interval_ = 60 * 60 * 1;
-    std::string bootstrap_url_ = "bootstrap.ring.cx";
-    std::string bootstrap_port_ = "4222";
-};
-
-}  // namespace opentxs
-#endif // OPENTXS_NETWORK_DHTCONFIG_HPP
+} // namespace opentxs

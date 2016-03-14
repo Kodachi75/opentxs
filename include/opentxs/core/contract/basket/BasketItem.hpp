@@ -36,30 +36,42 @@
  *
  ************************************************************/
 
-#ifndef OPENTXS_CORE_BASKET_BASKETCONTRACT_HPP
-#define OPENTXS_CORE_BASKET_BASKETCONTRACT_HPP
+#ifndef OPENTXS_BASKET_BASKETITEM_HPP
+#define OPENTXS_BASKET_BASKETITEM_HPP
 
-#include <opentxs/core/AssetContract.hpp>
+#include <opentxs/core/Identifier.hpp>
+
+#include <deque>
 
 namespace opentxs
 {
 
-class Basket;
-class Nym;
+class BasketItem;
 
-class BasketContract : public AssetContract
+typedef std::deque<BasketItem*> dequeOfBasketItems;
+
+class BasketItem
 {
 public:
-    EXPORT BasketContract(Basket& basket, Nym& signer);
-    virtual ~BasketContract();
+    Identifier SUB_CONTRACT_ID;
+    Identifier SUB_ACCOUNT_ID;
 
-    virtual void CreateContents();
+    int64_t lMinimumTransferAmount = 0;
 
-protected:
-    // return -1 if error, 0 if nothing, and 1 if the node was processed.
-    virtual int32_t ProcessXMLNode(irr::io::IrrXMLReader*& xml);
+    // lClosingTransactionNo:
+    // Used when EXCHANGING a basket (NOT USED when first creating one.)
+    // A basketReceipt must be dropped into each asset account during
+    // an exchange, to account for the change in balance. Until that
+    // receipt is accepted, lClosingTransactionNo will remain open as
+    // an issued transaction number (an open transaction) on that Nym.
+    // (One must be supplied for EACH asset account during an exchange.)
+    //
+    int64_t lClosingTransactionNo = 0;
+
+    BasketItem() = default;
+    ~BasketItem() = default;
 };
 
 } // namespace opentxs
 
-#endif // OPENTXS_CORE_BASKET_BASKETCONTRACT_HPP
+#endif // OPENTXS_BASKET_BASKETITEM_HPP

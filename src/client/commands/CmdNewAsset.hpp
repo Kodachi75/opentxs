@@ -144,7 +144,14 @@ public:
     EXPORT CmdNewAsset();
     virtual ~CmdNewAsset();
 
-    EXPORT int32_t run(std::string mynym);
+    EXPORT int32_t run(
+        std::string mynym,
+        std::string shortname,
+        std::string name,
+        std::string symbol,
+        std::string tla,
+        std::string power,
+        std::string fraction);
 
 protected:
     virtual int32_t runWithOptions();

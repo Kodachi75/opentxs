@@ -51,7 +51,6 @@ namespace opentxs
 class Mint;
 class OTServer;
 class Nym;
-class AssetContract;
 class Identifier;
 class Account;
 class MainFile;
@@ -81,17 +80,6 @@ public:
     {
         transactionNumber_ = value;
     }
-
-    // When a user uploads an asset contract, the server adds it to the list
-    // (and verifies the user's key against the
-    // contract.) This way the server has a directory with all the asset
-    // contracts that it supports, saved by their ID.
-    // As long as the IDs are in the server file, it can look them up.
-    // When a new instrument definition is added, a new Mint is added as well.
-    // It goes into
-    // the mints folder.
-    bool addAssetContract(AssetContract& contract);
-    AssetContract* getAssetContract(const Identifier& id);
 
     bool addBasketAccountID(const Identifier& basketId,
                             const Identifier& basketAccountId,
@@ -141,14 +129,11 @@ private:
     // accidentally remove one from the list every time another is added. Thus
     // multimap is employed.
     typedef std::multimap<std::string, Mint*> MintsMap;
-    typedef std::map<std::string, AssetContract*> ContractsMap;
     typedef std::map<std::string, std::string> BasketsMap;
 
 private:
     // This stores the last VALID AND ISSUED transaction number.
     int64_t transactionNumber_;
-    // The instrument definitions supported by this server.
-    ContractsMap contractsMap_;
     // maps basketId with basketAccountId
     BasketsMap idToBasketMap_;
     // basket issuer account ID, which is *different* on each server, using the

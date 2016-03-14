@@ -62,6 +62,7 @@
 #include <irrxml/irrXML.hpp>
 
 #include <algorithm>
+#include <array>
 #include <fstream>
 #include <memory>
 
@@ -78,63 +79,6 @@ void Nym::SetAsPrivate(bool isPrivate)
 bool Nym::isPrivate() const
 {
     return m_bPrivate;
-}
-
-Nym* Nym::LoadPublicNym(const Identifier& NYM_ID, const String* pstrName,
-                        const char* szFuncName,
-                        bool bChecking/*=false*/)
-{
-    const char* szFunc =
-        (nullptr != szFuncName) ? szFuncName : "Nym::LoadPublicNym";
-
-    const String strNymID(NYM_ID);
-
-    // If name is empty, construct one way,
-    // else construct a different way.
-    //
-    Nym* pNym = ((nullptr == pstrName) || !pstrName->Exists())
-                    ? (new Nym(NYM_ID))
-                    : (new Nym(*pstrName, strNymID, strNymID));
-    OT_ASSERT_MSG(nullptr != pNym,
-                  "Nym::LoadPublicNym: Error allocating memory.\n");
-
-    bool bLoadedKey =
-        pNym->LoadPublicKey(); // Deprecated. Only used for old-style Nyms.
-                               // Eventually, remove this. Currently
-                               // LoadPublicKey calls LoadCredentials, which is
-                               // what we should be calling, once the nym's own
-                               // keypair is eliminated.
-
-    // First load the public key
-    if (!bLoadedKey)
-    {
-        if (!bChecking)
-            otWarn << __FUNCTION__ << ": " << szFunc
-                   << ": Unable to find nym: " << strNymID << "\n";
-    }
-    else if (!pNym->VerifyPseudonym())
-    {
-        otErr << __FUNCTION__ << ": " << szFunc
-              << ": Security: Failure verifying Nym: " << strNymID << "\n";
-    }
-    else if (!pNym->LoadSignedNymfile(*pNym))
-    {
-        if (!bChecking)
-            otLog4 << "OTPseudonym::LoadPublicNym " << szFunc
-                   << ": Usually normal: There's no Nymfile (" << strNymID
-                   << "), though there IS a public "
-                      "key, which checks out. It's probably just someone else's "
-                      "Nym. (So I'm still returning this Nym to "
-                      "the caller so he can still use the public key.)\n";
-        return pNym;
-    }
-    else // success
-        return pNym;
-
-    delete pNym;
-    pNym = nullptr;
-
-    return nullptr;
 }
 
 /*
@@ -2548,13 +2492,13 @@ bool Nym::SavePseudonymWallet(Tag& parent) const
     // Name is in the clear in memory,
     // and base64 in storage.
     OTASCIIArmor ascName;
-    if (m_strName.Exists()) {
-        ascName.SetString(m_strName, false); // linebreaks == false
+    if (!alias_.empty()) {
+        ascName.SetString(alias_, false); // linebreaks == false
     }
 
     TagPtr pTag(new Tag("pseudonym"));
 
-    pTag->add_attribute("name", m_strName.Exists() ? ascName.Get() : "");
+    pTag->add_attribute("name", !alias_.empty() ? ascName.Get() : "");
     pTag->add_attribute("nymID", nymID.Get());
 
     parent.add_tag(pTag);
@@ -2691,7 +2635,7 @@ void Nym::DisplayStatistics(String& strOutput)
         strOutput.Concatenate("%s", "\n");
     }
 
-    strOutput.Concatenate("==>      Name: %s   %s\n", m_strName.Get(),
+    strOutput.Concatenate("==>      Name: %s   %s\n", alias_.c_str(),
                           m_bMarkForDeletion ? "(MARKED FOR DELETION)" : "");
     strOutput.Concatenate("      Version: %s\n", m_strVersion.Get());
 
@@ -2794,15 +2738,9 @@ bool Nym::ReEncryptPrivateCredentials(bool bImporting, // bImporting=true, or
     return true;
 }
 
-const String Nym::asPublicNym() const
+const serializedCredentialIndex Nym::asPublicNym() const
 {
-    serializedCredentialIndex credentials = SerializeCredentialIndex(Nym::FULL_CREDS);
-
-    OT_ASSERT(proto::Check<proto::CredentialIndex>(credentials, 0, 0xFFFFFFFF));
-
-    OTASCIIArmor armoredPublicNym(proto::ProtoAsData<proto::CredentialIndex>(credentials));
-
-    return armoredPublicNym.Get();
+    return SerializeCredentialIndex(Nym::FULL_CREDS);
 }
 
 void Nym::GetPrivateCredentials(String& strCredList, String::Map* pmapCredFiles)
@@ -2928,6 +2866,7 @@ serializedCredentialIndex Nym::SerializeCredentialIndex(const CredentialIndexMod
     serializedCredentialIndex index;
 
     index.set_version(credential_index_version_);
+    index.set_revision(credential_index_revision_);
 
     String nymID = m_nymID;
     index.set_nymid(nymID.Get());
@@ -2955,28 +2894,6 @@ serializedCredentialIndex Nym::SerializeCredentialIndex(const CredentialIndexMod
     return index;
 }
 
-//static
-serializedCredentialIndex Nym::ExtractArmoredCredentialIndex(
-                                                      const String& stringIndex)
-{
-    OTASCIIArmor armoredIndex;
-    String strTemp(stringIndex);
-    armoredIndex.Set(strTemp.Get());
-
-    return ExtractArmoredCredentialIndex(armoredIndex);
-}
-
-//static
-serializedCredentialIndex Nym::ExtractArmoredCredentialIndex(
-                                               const OTASCIIArmor& armoredIndex)
-{
-    OTData dataIndex(armoredIndex);
-    serializedCredentialIndex serializedIndex;
-    serializedIndex.ParseFromArray(dataIndex.GetPointer(), dataIndex.GetSize());
-
-    return serializedIndex;
-}
-
 bool Nym::LoadCredentialIndex(const serializedCredentialIndex& index)
 {
     if (!proto::Check<proto::CredentialIndex>(index, 0, 0xFFFFFFFF)) {
@@ -2986,6 +2903,7 @@ bool Nym::LoadCredentialIndex(const serializedCredentialIndex& index)
     }
 
     credential_index_version_ = index.version();
+    credential_index_revision_ = index.revision();
 
     Identifier nymID(index.nymid());
     m_nymID = nymID;
@@ -3011,29 +2929,6 @@ bool Nym::LoadCredentialIndex(const serializedCredentialIndex& index)
     }
 
     return true;
-}
-
-bool Nym::LoadCredentialIndex(const String& armoredIndex)
-{
-    serializedCredentialIndex index = ExtractArmoredCredentialIndex(
-                                                                  armoredIndex);
-
-    return LoadCredentialIndex(index);
-}
-
-OTData Nym::CredentialIndexAsData() const
-{
-    serializedCredentialIndex index = SerializeCredentialIndex();
-
-    return proto::ProtoAsData<proto::CredentialIndex>(index);
-}
-
-String Nym::CredentialIndexAsString() const
-{
-    OTData dataIndex = CredentialIndexAsData();
-    OTASCIIArmor armoredSource(dataIndex);
-
-    return armoredSource.Get();
 }
 
 // Save the Pseudonym to a string...
@@ -3376,6 +3271,90 @@ CredentialSet* Nym::GetMasterCredential(const String& strID)
     return pCredential;
 }
 
+const CredentialSet* Nym::MasterCredential(const String& strID) const
+{
+    auto iter = m_mapCredentialSets.find(strID.Get());
+    CredentialSet* pCredential = nullptr;
+
+    if (m_mapCredentialSets.end() != iter) // found it
+        pCredential = iter->second;
+
+    return pCredential;
+}
+
+std::shared_ptr<const proto::Credential> Nym::MasterCredentialContents(
+    const std::string& id) const
+{
+    std::shared_ptr<const proto::Credential> output;
+    auto credential = MasterCredential(id);
+
+    if (nullptr != credential) {
+        output = credential->GetMasterCredential().asSerialized(
+            Credential::AS_PUBLIC,
+            Credential::WITH_SIGNATURES);
+    }
+
+    return output;
+}
+
+int32_t Nym::ChildCredentialCount(const std::string& id) const
+{
+    int32_t output = 0;
+    auto credential = MasterCredential(id);
+
+    if (nullptr != credential) {
+        output = credential->GetChildCredentialCount();
+    }
+
+    return output;
+}
+
+std::string Nym::ChildCredentialID(
+    const std::string& masterID,
+    const uint32_t index) const
+{
+    std::string output = "";
+    auto credential = MasterCredential(masterID);
+
+    if (nullptr != credential) {
+        output = credential->GetChildCredentialIDByIndex(index);
+    }
+
+    return output;
+}
+
+std::shared_ptr<const proto::Credential> Nym::ChildCredentialContents(
+    const std::string& masterID,
+    const std::string& childID) const
+{
+    std::shared_ptr<const proto::Credential> output;
+    auto credential = MasterCredential(masterID);
+
+    if (nullptr != credential) {
+        output = credential->GetChildCredential(childID)->asSerialized(
+            Credential::AS_PUBLIC,
+            Credential::WITH_SIGNATURES);
+    }
+
+    return output;
+}
+
+std::shared_ptr<const proto::Credential> Nym::RevokedCredentialContents(
+    const std::string& id) const
+{
+    std::shared_ptr<const proto::Credential> output;
+
+    auto iter = m_mapRevokedSets.find(id);
+
+    if (m_mapRevokedSets.end() != iter) {
+        output = iter->second->GetMasterCredential().asSerialized(
+            Credential::AS_PUBLIC,
+            Credential::WITH_SIGNATURES);
+    }
+
+    return output;
+}
+
 CredentialSet* Nym::GetRevokedCredential(const String& strID)
 {
     auto iter = m_mapRevokedSets.find(strID.Get());
@@ -3498,44 +3477,6 @@ bool Nym::LoadNymFromString(const String& strNym,
     // parse the file until end reached
     while (xml && xml->read()) {
 
-        //        switch(xml->getNodeType())
-        //        {
-        //            case(EXN_NONE):
-        //                otErr << "ACK NUMS: EXN_NONE --  No xml node. This is
-        // usually the node if you did not read anything yet.\n";
-        //                break;
-        //            case(EXN_ELEMENT):
-        //                otErr << "ACK NUMS: EXN_ELEMENT -- An xml element such
-        // as <foo>.\n";
-        //                break;
-        //            case(EXN_ELEMENT_END):
-        //                otErr << "ACK NUMS: EXN_ELEMENT_END -- End of an xml
-        // element such as </foo>.\n";
-        //                break;
-        //            case(EXN_TEXT):
-        //                otErr << "ACK NUMS: EXN_TEXT -- Text within an xml
-        // element: <foo> this is the text. <foo>.\n";
-        //                break;
-        //            case(EXN_COMMENT):
-        //                otErr << "ACK NUMS: EXN_COMMENT -- An xml comment like
-        // <!-- I am a comment --> or a DTD definition.\n";
-        //                break;
-        //            case(EXN_CDATA):
-        //                otErr << "ACK NUMS: EXN_CDATA -- An xml cdata section
-        // like <![CDATA[ this is some CDATA ]]>.\n";
-        //                break;
-        //            case(EXN_UNKNOWN):
-        //                otErr << "ACK NUMS: EXN_UNKNOWN -- Unknown
-        // element.\n";
-        //                break;
-        //            default:
-        //                otErr << "ACK NUMS: default!! -- SHOULD NEVER
-        // HAPPEN...\n";
-        //                break;
-        //        }
-        //        otErr << "OTPseudonym::LoadFromString: NODE DATA: %s\n",
-        // xml->getNodeData());
-
         // strings for storing the data that we want to read out of the file
         //
         switch (xml->getNodeType()) {
@@ -3544,37 +3485,6 @@ bool Nym::LoadNymFromString(const String& strNym,
         case irr::io::EXN_COMMENT:
         case irr::io::EXN_ELEMENT_END:
         case irr::io::EXN_CDATA:
-            // in this xml file, the only text which occurs is the messageText
-            // messageText = xml->getNodeData();
-
-            //            switch(xml->getNodeType())
-            //            {
-            //                case(EXN_NONE):
-            //                    otErr << "SKIPPING: EXN_NONE --  No xml node.
-            // This is usually the node if you did not read anything yet.\n";
-            //                    break;
-            //                case(EXN_TEXT):
-            //                    otErr << "SKIPPING: EXN_TEXT -- Text within an
-            // xml element: <foo> this is the text. <foo>.\n";
-            //                    break;
-            //                case(EXN_COMMENT):
-            //                    otErr << "SKIPPING: EXN_COMMENT -- An xml
-            // comment like <!-- I am a comment --> or a DTD definition.\n";
-            //                    break;
-            //                case(EXN_ELEMENT_END):
-            //                    otErr << "SKIPPING: EXN_ELEMENT_END -- End of
-            // an xml element such as </foo>.\n";
-            //                    break;
-            //                case(EXN_CDATA):
-            //                    otErr << "SKIPPING: EXN_CDATA -- An xml cdata
-            // section like <![CDATA[ this is some CDATA ]]>.\n";
-            //                    break;
-            //                default:
-            //                    otErr << "SKIPPING: default!! -- SHOULD NEVER
-            // HAPPEN...\n";
-            //                    break;
-            //            }
-
             break;
         case irr::io::EXN_ELEMENT: {
             const String strNodeName = xml->getNodeName();
@@ -4012,76 +3922,6 @@ bool Nym::LoadNymFromString(const String& strNym,
                                                              // to disk AS WE'RE
                                                              // LOADING?)
                 }
-            }
-
-            // THE BELOW FOUR ARE DEPRECATED, AND ARE REPLACED BY THE ABOVE
-            // FOUR.
-            else if (strNodeName.Compare("transactionNum")) {
-                const String TransNumNotaryID =
-                    xml->getAttributeValue("notaryID");
-                const String TransNumAvailable =
-                    xml->getAttributeValue("transactionNum");
-
-                otLog3 << "Transaction Number " << TransNumAvailable
-                       << " available for NotaryID: " << TransNumNotaryID
-                       << "\n";
-
-                AddTransactionNum(
-                    TransNumNotaryID,
-                    TransNumAvailable.ToLong()); // This version doesn't save
-                                                 // to disk. (Why save to
-                                                 // disk AS WE'RE LOADING?)
-            }
-            else if (strNodeName.Compare("issuedNum")) {
-                const String TransNumNotaryID =
-                    xml->getAttributeValue("notaryID");
-                const String TransNumAvailable =
-                    xml->getAttributeValue("transactionNum");
-
-                otLog3 << "Currently liable for Transaction Number "
-                       << TransNumAvailable
-                       << ", for NotaryID: " << TransNumNotaryID << "\n";
-
-                AddIssuedNum(TransNumNotaryID,
-                             TransNumAvailable.ToLong()); // This version
-                                                          // doesn't save to
-                                                          // disk. (Why save
-                                                          // to disk AS WE'RE
-                                                          // LOADING?)
-            }
-            else if (strNodeName.Compare("tentativeNum")) {
-                const String TransNumNotaryID =
-                    xml->getAttributeValue("notaryID");
-                const String TransNumAvailable =
-                    xml->getAttributeValue("transactionNum");
-
-                otLog3 << "Currently waiting on server success notice, "
-                          "accepting Transaction Number " << TransNumAvailable
-                       << ", for NotaryID: " << TransNumNotaryID << "\n";
-
-                AddTentativeNum(TransNumNotaryID,
-                                TransNumAvailable.ToLong()); // This version
-                                                             // doesn't save
-                                                             // to disk. (Why
-                                                             // save to disk
-                                                             // AS WE'RE
-                                                             // LOADING?)
-            }
-            else if (strNodeName.Compare("acknowledgedNum")) {
-                const String AckNumNotaryID =
-                    xml->getAttributeValue("notaryID");
-                const String AckNumValue = xml->getAttributeValue("requestNum");
-
-                otLog3 << "Acknowledgment record exists for server reply, for "
-                          "Request Number " << AckNumValue
-                       << ", for NotaryID: " << AckNumNotaryID << "\n";
-
-                AddAcknowledgedNum(AckNumNotaryID,
-                                   AckNumValue.ToLong()); // This version
-                                                          // doesn't save to
-                                                          // disk. (Why save
-                                                          // to disk AS WE'RE
-                                                          // LOADING?)
             }
             else if (strNodeName.Compare("MARKED_FOR_DELETION")) {
                 m_bMarkForDeletion = true;
@@ -4740,6 +4580,7 @@ Nym::Nym(const NymParameters& nymParameters)
     String strMasterCredID;
 
     credential_index_version_ = 1;
+    credential_index_revision_ = 1;
     CredentialSet* pNewCredentialSet = new CredentialSet(nymParameters);
 
     SetSource(pNewCredentialSet->Source());
@@ -4766,7 +4607,7 @@ Nym::Nym(const String& name, const String& filename, const String& nymID)
 {
     Initialize();
 
-    m_strName = name;
+    alias_ = name.Get();
     m_strNymfile = filename;
 
     m_nymID.SetString(nymID);
@@ -4868,9 +4709,9 @@ bool Nym::WriteCredentials() const
     return true;
 }
 
-proto::ContactData Nym::ContactData() const
+std::shared_ptr<proto::ContactData> Nym::ContactData() const
 {
-    proto::ContactData contactData;
+    std::shared_ptr<proto::ContactData> contactData;
 
     for (auto& it : m_mapCredentialSets) {
         if (nullptr != it.second) {
@@ -4922,6 +4763,7 @@ bool Nym::SetContactData(const proto::ContactData& data)
 
     if (added) {
         if (VerifyPseudonym()) {
+            credential_index_revision_++;
             SaveCredentialIDs();
 
             return true;
@@ -4959,6 +4801,7 @@ bool Nym::SetVerificationSet(const proto::VerificationSet& data)
 
     if (added) {
         if (VerifyPseudonym()) {
+            credential_index_revision_++;
             SaveCredentialIDs();
 
             return true;
@@ -5071,7 +4914,32 @@ bool Nym::Sign(proto::ServerContract& contract) const
     return haveSig;
 }
 
-bool Nym::Verify(const OTData& plaintext, proto::Signature& sig) const
+bool Nym::Sign(
+    const proto::UnitDefinition& contract,
+    proto::Signature& sig) const
+{
+    bool haveSig = false;
+
+    for (auto& it: m_mapCredentialSets) {
+        if (nullptr != it.second) {
+            bool success = it.second->Sign(
+                proto::ProtoAsData<proto::UnitDefinition>(contract),
+                sig,
+                nullptr,
+                nullptr,
+                proto::SIGROLE_UNITDEFINITION);
+
+            if (success) {
+                haveSig = true;
+                break;
+            }
+        }
+    }
+
+    return haveSig;
+}
+
+bool Nym::Verify(const OTData& plaintext, const proto::Signature& sig) const
 {
     for (auto& it: m_mapCredentialSets) {
         if (nullptr != it.second) {
@@ -5099,14 +4967,18 @@ bool Nym::Verify(const proto::Verification& item) const
 
 zcert_t* Nym::TransportKey() const
 {
-    unsigned char publicKey[crypto_box_PUBLICKEYBYTES]{};
-    unsigned char privateKey[crypto_box_SECRETKEYBYTES]{};
+    std::array<unsigned char, crypto_box_PUBLICKEYBYTES> publicKey;
+    std::array<unsigned char, crypto_box_SECRETKEYBYTES> privateKey;
 
     bool generated = false;
 
     for (auto& it: m_mapCredentialSets) {
         if (nullptr != it.second) {
-            if (it.second->TransportKey(publicKey, privateKey)) {
+            const CredentialSet* credSet = it.second;
+
+            OT_ASSERT(nullptr != credSet);
+
+            if (credSet->TransportKey(publicKey.data(), privateKey.data())) {
                 generated = true;
                 break;
             }
@@ -5114,7 +4986,7 @@ zcert_t* Nym::TransportKey() const
     }
 
     if (generated) {
-        return zcert_new_from(publicKey, privateKey);
+        return zcert_new_from(publicKey.data(), privateKey.data());
     }
 
     return nullptr;

@@ -93,7 +93,7 @@ bool OTDataFolder::Init(const String& strThreadContext)
     pDataFolder->m_bInitialized = false;
 
     // setup the config instance.
-    Settings* pSettings(new Settings(OTPaths::GlobalConfigFile()));
+    std::unique_ptr<Settings> pSettings(new Settings(OTPaths::GlobalConfigFile()));
     pSettings->Reset();
     if (!pSettings->Load()) return false;
 
@@ -181,9 +181,6 @@ bool OTDataFolder::Init(const String& strThreadContext)
     // save config
     if (!pSettings->Save()) return false;
     pSettings->Reset();
-
-    if (nullptr != pSettings) delete pSettings;
-    pSettings = nullptr;
 
     // have set the default dir, now returning true;
 

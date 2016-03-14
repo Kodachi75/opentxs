@@ -57,7 +57,7 @@
 #include <opentxs/core/util/Assert.hpp>
 #include <opentxs/core/Log.hpp>
 #include <opentxs/core/Contract.hpp>
-#include <opentxs/core/AssetContract.hpp>
+#include "opentxs/core/contract/UnitDefinition.hpp"
 #include <opentxs/core/Cheque.hpp>
 #include <opentxs/core/Message.hpp>
 
@@ -138,19 +138,6 @@ opentxs::Contract* InstantiateContract(opentxs::String strInput)
                        "-----BEGIN SIGNED LUCRE CASH TOKEN-----")) {
             pContract = Token::LowLevelInstantiate(strFirstLine);
             OT_ASSERT(nullptr != pContract);
-        }
-
-        // TODO: Might want to clarify in Asset and Server Contracts,
-        // so I don't have to do this crap... The ones above are cleaner.
-        //
-        else if (strFirstLine.Contains("-----BEGIN SIGNED CONTRACT-----")) {
-            if (strContract.Contains(
-                        "<instrumentDefinition") ||
-                    strContract.Contains(
-                        "<unitTypeDefinition")) {
-                pContract = new AssetContract();
-                OT_ASSERT(nullptr != pContract);
-            }
         }
 
         // The string didn't match any of the options in the factory.

@@ -39,10 +39,12 @@
 #include <opentxs/core/app/Dht.hpp>
 
 #include <opentxs/core/Log.hpp>
-#include <opentxs/core/contract/ServerContract.hpp>
-#include <opentxs/core/Proto.hpp>
+#include <opentxs/core/OTData.hpp>
 #include <opentxs/core/String.hpp>
 #include <opentxs/core/app/App.hpp>
+#include <opentxs/core/contract/ServerContract.hpp>
+#include <opentxs/core/contract/UnitDefinition.hpp>
+#include <opentxs/core/crypto/Credential.hpp>
 
 namespace opentxs
 {
@@ -62,14 +64,14 @@ void Dht::Init()
 #endif
 }
 
-Dht& Dht::It(DhtConfig& config)
+Dht* Dht::It(DhtConfig& config)
 {
     if (nullptr == instance_)
     {
         instance_ = new Dht(config);
     }
 
-    return *instance_;
+    return instance_;
 }
 
 void Dht::Insert(
@@ -83,25 +85,6 @@ void Dht::Insert(
     #endif
 }
 
-void Dht::Insert(
-    __attribute__((unused)) const std::string& ID,
-    __attribute__((unused)) const Contract& contract)
-{
-#ifdef OT_DHT
-    OT_ASSERT(nullptr != node_);
-
-    String data(contract);
-    node_->Insert(ID, data.Get());
-#endif
-}
-
-void Dht::Insert(__attribute__((unused)) const Nym& nym)
-{
-#ifdef OT_DHT
-    Insert(nym.SerializeCredentialIndex(Nym::FULL_CREDS));
-#endif
-}
-
 void Dht::Insert(__attribute__((unused)) const serializedCredentialIndex& nym)
 {
 #ifdef OT_DHT
@@ -109,7 +92,7 @@ void Dht::Insert(__attribute__((unused)) const serializedCredentialIndex& nym)
 
     node_->Insert(
         nym.nymid(),
-        proto::ProtoAsString<serializedCredentialIndex>(nym));
+        proto::ProtoAsString(nym));
 #endif
 }
 
@@ -120,7 +103,18 @@ void Dht::Insert(__attribute__((unused)) const proto::ServerContract& contract)
 
     node_->Insert(
         contract.id(),
-        proto::ProtoAsString<proto::ServerContract>(contract));
+        proto::ProtoAsString(contract));
+#endif
+}
+
+void Dht::Insert(__attribute__((unused)) const proto::UnitDefinition& contract)
+{
+#ifdef OT_DHT
+    OT_ASSERT(nullptr != node_);
+
+    node_->Insert(
+        contract.id(),
+        proto::ProtoAsString(contract));
 #endif
 }
 
@@ -147,8 +141,7 @@ void Dht::GetPublicNym(
 }
 
 void Dht::GetServerContract(
-    __attribute__((unused)) const std::string& key,
-    __attribute__((unused)) std::function<void(const ServerContract&)> cb)
+    __attribute__((unused)) const std::string& key)
 {
 #ifdef OT_DHT
     OT_ASSERT(nullptr != node_);
@@ -162,8 +155,30 @@ void Dht::GetServerContract(
     }
 
     dht::Dht::GetCallback gcb(
-        [cb, notifyCB](const OpenDHT::Results& values) -> bool {
-            return ProcessServerContract(values, notifyCB, cb);});
+        [notifyCB](const OpenDHT::Results& values) -> bool {
+            return ProcessServerContract(values, notifyCB);});
+
+    node_->Retrieve(key, gcb);
+#endif
+}
+
+void Dht::GetUnitDefinition(
+    __attribute__((unused)) const std::string& key)
+{
+#ifdef OT_DHT
+    OT_ASSERT(nullptr != node_);
+
+    auto it = callback_map_.find(Dht::Callback::ASSET_CONTRACT);
+    bool haveCB = (it != callback_map_.end());
+    NotifyCB notifyCB;
+
+    if (haveCB) {
+        notifyCB = it->second;
+    }
+
+    dht::Dht::GetCallback gcb(
+        [notifyCB](const OpenDHT::Results& values) -> bool {
+            return ProcessUnitDefinition(values, notifyCB);});
 
     node_->Retrieve(key, gcb);
 #endif
@@ -190,26 +205,29 @@ bool Dht::ProcessPublicNym(
 
         if (0 == data.size()) { continue; }
 
-        serializedCredentialIndex publicNym;
-        publicNym.ParseFromArray(data.c_str(), data.size());
+        auto publicNym =
+            proto::DataToProto<proto::CredentialIndex>
+            (OTData(data.c_str(), data.size()));
 
         if (nymID != publicNym.nymid()) { continue; }
 
-        Nym nym;
-        bool loaded = nym.LoadCredentialIndex(publicNym);
+        auto existing  = App::Me().Contract().Nym(nymID);
 
-        if (!loaded) { continue; }
-
-        if (!nym.VerifyPseudonym()) { continue; }
-
-        if (App::Me().DB().Store(publicNym)) {
-            otLog3 << "Saved public nym: " << ptr.user_type << std::endl;
-            foundValid = true;
-            break; // We only need the first valid result
+        if (existing) {
+            if (existing->Revision() >= publicNym.revision()) {
+                continue;
+            }
         }
 
+        auto saved = App::Me().Contract().Nym(publicNym);
+
+        if (!saved) { continue; }
+
+        foundValid = true;
+        otLog3 << "Saved nym: " << nymID << std::endl;
+
         if (notifyCB) {
-            notifyCB(ptr.user_type);
+            notifyCB(nymID);
         }
     }
 
@@ -224,10 +242,10 @@ bool Dht::ProcessPublicNym(
 
     return foundData;
 }
+
 bool Dht::ProcessServerContract(
     const OpenDHT::Results& values,
-    NotifyCB notifyCB,
-    ServerContractCB cb)
+    NotifyCB notifyCB)
 {
     std::string theresult;
     bool foundData = false;
@@ -245,24 +263,72 @@ bool Dht::ProcessServerContract(
 
         if (0 == data.size()) { continue; }
 
-        proto::ServerContract contract;
-        contract.ParseFromArray(data.c_str(), data.size());
+        auto contract =
+            proto::DataToProto<proto::ServerContract>
+                (OTData(data.c_str(), data.size()));
 
-        std::unique_ptr<ServerContract>
-            serverContract(ServerContract::Factory(contract));
+        auto saved = App::Me().Contract().Server(contract);
 
-        if (!serverContract->Validate()) { continue; }
+        if (!saved) { continue; }
 
-        if (cb) {
-            cb(*serverContract);
-            otLog3 << "Saved contract: " << ptr.user_type << std::endl;
-            foundValid = true;
-            break; // We only need the first valid result
-        }
+        otLog3 << "Saved contract: " << ptr.user_type << std::endl;
+        foundValid = true;
 
         if (notifyCB) {
             notifyCB(ptr.user_type);
         }
+
+        break; // We only need the first valid result
+    }
+
+    if (!foundValid) {
+        otErr << __FUNCTION__ << "Found results, but none are valid."
+              << std::endl;
+    }
+
+    if (!foundData) {
+        otErr << __FUNCTION__ << "All results are empty" << std::endl;
+    }
+
+    return foundData;
+}
+
+bool Dht::ProcessUnitDefinition(
+    const OpenDHT::Results& values,
+    NotifyCB notifyCB)
+{
+    std::string theresult;
+    bool foundData = false;
+    bool foundValid = false;
+
+    for (const auto & it: values)
+    {
+        auto & ptr = *it;
+        std::string data(ptr.data.begin(), ptr.data.end());
+        foundData = data.size() > 0;
+
+        if (0 == ptr.user_type.size()) { continue; }
+
+        Identifier contractID(ptr.user_type);
+
+        if (0 == data.size()) { continue; }
+
+        auto contract =
+            proto::DataToProto<proto::UnitDefinition>
+                (OTData(data.c_str(), data.size()));
+
+        auto saved = App::Me().Contract().UnitDefinition(contract);
+
+        if (!saved) { continue; }
+
+        otLog3 << "Saved unit definition: " << ptr.user_type << std::endl;
+        foundValid = true;
+
+        if (notifyCB) {
+            notifyCB(ptr.user_type);
+        }
+
+        break; // We only need the first valid result
     }
 
     if (!foundValid) {
@@ -284,6 +350,7 @@ void Dht::Cleanup()
     if (nullptr != node_)
         delete node_;
     node_ = nullptr;
+    instance_ = nullptr;
 #endif
 }
 

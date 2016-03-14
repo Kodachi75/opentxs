@@ -71,8 +71,11 @@ Identifier::Identifier(const char* szStr)
 Identifier::Identifier(const std::string& theStr)
     : OTData()
 {
-    OT_ASSERT(!theStr.empty());
-    SetString(theStr.c_str());
+    if (theStr.empty()) {
+        SetString("");
+    } else {
+        SetString(theStr.c_str());
+    }
 }
 
 Identifier::Identifier(const String& theStr)
@@ -114,6 +117,12 @@ Identifier::Identifier(const OTCachedKey& theKey)
                          // tried to do this, and figure out where its logic
                          // went wrong, since it should have made sure this
                          // would not happen, before constructing like this.)
+}
+
+Identifier& Identifier::operator=(Identifier rhs)
+{
+    swap(rhs);
+    return *this;
 }
 
 void Identifier::SetString(const char* szString)

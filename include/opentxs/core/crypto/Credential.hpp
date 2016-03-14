@@ -42,8 +42,8 @@
 #include <memory>
 #include <opentxs-proto/verify/VerifyCredentials.hpp>
 
-#include <opentxs/core/Signable.hpp>
-#include <opentxs/core/String.hpp>
+#include "opentxs/core/String.hpp"
+#include "opentxs/core/contract/Signable.hpp"
 
 // A nym contains a list of credential sets.
 // The whole purpose of a Nym is to be an identity, which can have
@@ -124,6 +124,7 @@ private:
     bool isValid(serializedCredential& credential) const;
 
     Identifier GetID() const override;
+    std::string Name() const override { return String(id_).Get(); }
     bool VerifyMasterID() const;
     bool VerifyNymID() const;
     bool VerifySignedByMaster() const;
@@ -164,11 +165,12 @@ public:
     virtual bool VerifyInternally() const;
 
     virtual void ReleaseSignatures(const bool onlyPrivate);
-    bool Save() const override;
+    virtual bool Save() const;
     OTData Serialize() const override;
     bool Validate() const override;
 
-    virtual bool GetContactData(proto::ContactData& contactData) const;
+    virtual bool GetContactData(
+        std::shared_ptr<proto::ContactData>& contactData) const;
     virtual bool GetVerificationSet(
         std::shared_ptr<proto::VerificationSet>& verificationSet) const;
 
@@ -184,8 +186,8 @@ public:
         proto::KeyRole key = proto::KEYROLE_SIGN) const;
     virtual bool Verify(
         const OTData& plaintext,
-        proto::Signature& sig,
-        proto::KeyRole key = proto::KEYROLE_SIGN) const;
+        const proto::Signature& sig,
+        const proto::KeyRole key = proto::KEYROLE_SIGN) const;
     virtual bool Verify(const Credential& credential) const;
     virtual bool TransportKey(
         unsigned char* publicKey,

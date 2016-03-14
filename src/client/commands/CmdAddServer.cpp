@@ -67,7 +67,8 @@ int32_t CmdAddServer::run()
         return -1;
     }
 
-    if (1 != OTAPI_Wrap::AddServerContract(contract)) {
+
+    if ("" == OTAPI_Wrap::AddServerContract(contract)) {
         otOut << "Error: cannot add server contract.\n";
         return -1;
     }

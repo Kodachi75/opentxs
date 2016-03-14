@@ -39,24 +39,25 @@
 #include <opentxs/core/stdafx.hpp>
 
 #include <opentxs/client/OTRecordList.hpp>
+
+#include <memory>
+#include <algorithm>
+
 #include <opentxs/client/OpenTransactions.hpp>
 #include <opentxs/client/OT_ME.hpp>
 #include <opentxs/client/OTAPI.hpp>
 #include <opentxs/client/OTAPI_Exec.hpp>
 #include "Helpers.hpp"
 #include <opentxs/client/OTWallet.hpp>
-
-#include <opentxs/ext/OTPayment.hpp>
-
 #include <opentxs/core/Account.hpp>
-#include <opentxs/core/AssetContract.hpp>
 #include <opentxs/core/Ledger.hpp>
 #include <opentxs/core/Log.hpp>
 #include <opentxs/core/Message.hpp>
 #include <opentxs/core/Nym.hpp>
-
-#include <memory>
-#include <algorithm>
+#include "opentxs/core/app/App.hpp"
+#include "opentxs/core/contract/UnitDefinition.hpp"
+#include "opentxs/core/contract/CurrencyContract.hpp"
+#include <opentxs/ext/OTPayment.hpp>
 
 namespace
 {
@@ -377,19 +378,21 @@ void OTRecordList::AddInstrumentDefinitionID(std::string str_id)
     // Name is dollars, fraction is cents, TLA is USD and
     // Symbol is $ (for example.) Here, we're grabbing the TLA.
     //
-    AssetContract* pAssetContract =
-        pWallet->GetAssetContract(theInstrumentDefinitionID);
-    if (nullptr != pAssetContract) {
+    auto pUnitDefinition =
+        App::Me().Contract().UnitDefinition(
+            String(theInstrumentDefinitionID).Get());
+    // Wallet owns this object
+    if (nullptr != pUnitDefinition) {
         str_asset_name =
-            pAssetContract->GetCurrencyTLA().Get(); // This might be "USD" --
+            pUnitDefinition->TLA(); // This might be "USD" --
                                                     // preferable that this
                                                     // works.
         if (str_asset_name.empty())
             str_asset_name =
-                pAssetContract->GetCurrencySymbol().Get(); // This might be "$".
+                pUnitDefinition->GetCurrencySymbol(); // This might be "$".
         if (str_asset_name.empty())
             str_asset_name =
-                pAssetContract->GetCurrencyName().Get(); // This might be
+                pUnitDefinition->GetCurrencyName(); // This might be
                                                          // "dollars".
     }
     if (str_asset_name.empty())
@@ -513,7 +516,7 @@ bool OTRecordList::PerformAutoAccept()
             const std::string& str_nym_id(it_nym);
             const Identifier theNymID(str_nym_id);
             const String strNymID(theNymID);
-            Nym* pNym = pWallet->GetNymByID(theNymID);
+            Nym* pNym = OTAPI_Wrap::OTAPI()->GetNym(theNymID);
             if (nullptr == pNym) continue;
             // LOOP SERVERS
             //
@@ -524,9 +527,8 @@ bool OTRecordList::PerformAutoAccept()
                 ++nServerIndex;
                 const std::string& str_notary_id(it_server);
                 const Identifier theNotaryID(str_notary_id);
-                ServerContract* pServer =
-                    pWallet->GetServerContract(theNotaryID);
-                if (nullptr == pServer)
+                auto pServer = App::Me().Contract().Server(theNotaryID);
+                if (!pServer)
                 {
                     // This can happen if the user erases the server contract
                     // from the wallet. Therefore we just need to skip it.
@@ -538,11 +540,11 @@ bool OTRecordList::PerformAutoAccept()
                 const String strNotaryID(theNotaryID);
                 otInfo << __FUNCTION__ << ": Server " << nServerIndex
                       << ", ID: " << strNotaryID.Get() << "\n";
-                
+
                 mapOfPayments thePaymentMap;
-                
+
                 std::map<int32_t, int64_t> mapPaymentBoxTransNum;
-                
+
                 // OPTIMIZE FYI:
                 // The "NoVerify" version is much faster, but you will lose the
                 // ability to get the
@@ -664,10 +666,10 @@ bool OTRecordList::PerformAutoAccept()
                                       << ": Adding to acceptance "
                                          "list: pending incoming "
                                       << str_type.c_str() << ".\n";
-                                    
+
                                 mapPaymentBoxTransNum.insert(
                                     std::pair<int32_t, int64_t>(nIndex, lPaymentBoxTransNum));
-                                    
+
                                 thePaymentMap.insert(
                                     std::pair<int32_t, OTPayment*>(
                                         nIndex, thePaymentAngel.release()));
@@ -715,13 +717,13 @@ bool OTRecordList::PerformAutoAccept()
                                      "(Skipping.)\n";
                             continue;
                         }
-                        
+
                         std::map<int32_t, int64_t>::iterator it_pmnt_box_trns_num = mapPaymentBoxTransNum.find(lIndex);
                         int64_t lPaymentBoxTransNum = 0;
 
                         if (it_pmnt_box_trns_num != mapPaymentBoxTransNum.end())
                             lPaymentBoxTransNum = it_pmnt_box_trns_num->second;
-                        
+
                         Identifier paymentAssetType;
                         bool bGotAsset = pPayment->GetInstrumentDefinitionID(
                             paymentAssetType);
@@ -794,7 +796,7 @@ bool OTRecordList::PerformAutoAccept()
                                 const std::string str_indices(strIndices.Get());
 
                                 std::string str_server_response;
-                                
+
                                 OT_ME madeEasy;
                                 if (!madeEasy.accept_from_paymentbox_overload(
                                         str_account_id, str_indices, "ANY", &str_server_response)) {
@@ -807,12 +809,12 @@ bool OTRecordList::PerformAutoAccept()
                                     int64_t temp_number         = 0;
                                     int64_t temp_trans_number   = 0;
                                     int64_t temp_display_number = 0;
-                                    
+
                                     if (pPayment->GetTransactionNum (temp_number)) temp_trans_number   = temp_number;
                                     if (pPayment->GetTransNumDisplay(temp_number)) temp_display_number = temp_number;
-                                    
+
                                     int64_t display_number = (temp_display_number > 0) ? temp_display_number : temp_trans_number;
-                                    
+
                                     // Last resort here. The number in my payment box is one that is guaranteed I
                                     // will never be able to match up with a number in anyone else's payment box.
                                     // So what use is it for display? It's also guaranteed that multiple of my receipts
@@ -1107,7 +1109,7 @@ bool OTRecordList::Populate()
         const std::string& str_nym_id(it_nym);
         const Identifier theNymID(str_nym_id);
         const String strNymID(theNymID);
-        Nym* pNym = pWallet->GetNymByID(theNymID);
+        Nym* pNym = OTAPI_Wrap::OTAPI()->GetNym(theNymID);
         if (nullptr == pNym) continue;
         // For each Nym, loop through his OUTPAYMENTS box.
         //
@@ -1187,18 +1189,18 @@ bool OTRecordList::Populate()
                              "about instrument definition "
                           << str_outpmt_asset.c_str() << ")\n";
 
-                    
-                    
-                    
-                    
+
+
+
+
                     otErr << __FUNCTION__
                     << ": Skipping outpayment (we don't care "
                     "about instrument definition "
                     << str_outpmt_asset.c_str() << ")\n";
 
-                    
-                    
-                    
+
+
+
                     continue;
                 }
             }
@@ -1253,9 +1255,9 @@ bool OTRecordList::Populate()
                           << ": Skipping outpayment (we don't care "
                              "about account " << str_outpmt_account.c_str()
                           << ")\n";
-                    
-                    
-                    
+
+
+
                     otErr << __FUNCTION__
                           << ": Skipping outpayment (we don't care "
                              "about account " << str_outpmt_account.c_str()
@@ -1361,19 +1363,19 @@ bool OTRecordList::Populate()
                 if (!str_memo.empty()) sp_Record->SetMemo(str_memo);
                 sp_Record->SetDateRange(tFrom, tTo);
                 sp_Record->SetBoxIndex(nCurrentOutpayment);
-                
+
                 int64_t lTransNum = 0, lTransNumDisplay = 0;
                 theOutPayment.GetOpeningNum(lTransNum, theNymID);
                 theOutPayment.GetTransNumDisplay(lTransNumDisplay);
-                
+
                 if (lTransNumDisplay <= 0)
                     lTransNumDisplay = lTransNum;
-                
+
                 sp_Record->SetTransactionNum(lTransNum);
                 sp_Record->SetTransNumForDisplay(lTransNumDisplay);
-                
+
                 m_contents.push_back(sp_Record);
-                
+
 //                otErr << "DEBUGGING! Added pending outgoing: " << str_type.c_str() << "."
 //                "\n lTransNum: " << lTransNum << "\n";
 
@@ -1451,7 +1453,7 @@ bool OTRecordList::Populate()
                 //
                 otInfo << __FUNCTION__ << ": ADDED: incoming mail.\n";
 
-                shared_ptr_OTRecord sp_Record(new OTRecord(*this, 
+                shared_ptr_OTRecord sp_Record(new OTRecord(*this,
                     *it_server, *p_str_asset_type, *p_str_asset_name,
                     str_nym_id,     // This is the Nym WHOSE BOX IT IS.
                     *p_str_account, // This is the Nym's account according to
@@ -1549,7 +1551,7 @@ bool OTRecordList::Populate()
                 //
                 otInfo << __FUNCTION__ << ": ADDED: sent mail.\n";
 
-                shared_ptr_OTRecord sp_Record(new OTRecord(*this, 
+                shared_ptr_OTRecord sp_Record(new OTRecord(*this,
                     *it_server, *p_str_asset_type, *p_str_asset_name,
                     str_nym_id,     // This is the Nym WHOSE BOX IT IS.
                     *p_str_account, // This is the Nym's account according to
@@ -1589,8 +1591,8 @@ bool OTRecordList::Populate()
         for (auto& it_server : m_servers) {
             ++nServerIndex;
             const Identifier theNotaryID(it_server);
-            ServerContract* pServer = pWallet->GetServerContract(theNotaryID);
-            if (nullptr == pServer)
+            auto pServer = App::Me().Contract().Server(theNotaryID);
+            if (!pServer)
             {
                 // This can happen if the user erases the server contract
                 // from the wallet. Therefore we just need to skip it.
@@ -1682,7 +1684,7 @@ bool OTRecordList::Populate()
                     String strContents; // Instrument contents.
 
                     int64_t lPaymentInstrumentTransNum = 0, lPaymentInstrumentTransNumDisplay = 0;
-                    
+
                     if (pBoxTrans->IsAbbreviated()) {
                         str_type =
                             pBoxTrans->GetTypeString(); // instrumentNotice, etc.
@@ -1720,7 +1722,7 @@ bool OTRecordList::Populate()
                         // receipt in the payments inbox.
                         //
                         else if (pPayment->SetTempValues()) {
-                            
+
                             int64_t lOpeningNum = 0;
                             // It may be that the Nym has a transaction number of his own
                             // on this instrument, even if it's not the main transaction
@@ -1743,12 +1745,12 @@ bool OTRecordList::Populate()
                                 lPaymentInstrumentTransNum = lOpeningNum;
                             else
                                 pPayment->GetTransactionNum(lPaymentInstrumentTransNum);
-                            
+
                             pPayment->GetTransNumDisplay(lPaymentInstrumentTransNumDisplay);
-                            
+
                             if (lPaymentInstrumentTransNumDisplay <= 0)
                                 lPaymentInstrumentTransNumDisplay = lPaymentInstrumentTransNum;
-                            
+
                             pPayment->GetValidFrom(tValidFrom);
                             pPayment->GetValidTo(tValidTo);
 
@@ -1839,7 +1841,7 @@ bool OTRecordList::Populate()
                           << ": ADDED: pending incoming payment (str_type: "
                           << str_type.c_str() << ")\n";
 
-                    shared_ptr_OTRecord sp_Record(new OTRecord(*this, 
+                    shared_ptr_OTRecord sp_Record(new OTRecord(*this,
                         it_server, *p_str_asset_type, *p_str_asset_name,
                         str_nym_id, // This is the Nym WHOSE BOX IT IS.
                         OTRecordList::s_blank, // This is the Nym's account for
@@ -1869,7 +1871,7 @@ bool OTRecordList::Populate()
                         sp_Record->SetOtherNymID(str_sender_nym_id);
                     if (!str_sender_acct_id.empty())
                         sp_Record->SetOtherAccountID(str_sender_acct_id);
-                    
+
                     if (lPaymentInstrumentTransNumDisplay > 0)
                         sp_Record->SetTransNumForDisplay(lPaymentInstrumentTransNumDisplay);
                     else
@@ -1879,7 +1881,7 @@ bool OTRecordList::Populate()
 //                    otErr << "DEBUGGING! Added pending incoming payment. str_type: " << str_type.c_str() <<
 //                    "\n pBoxTrans->GetTransactionNum(): " << pBoxTrans->GetTransactionNum() <<
 //                    "\n pBoxTrans->GetReferenceNumForDisplay()" << pBoxTrans->GetReferenceNumForDisplay() << "\n";
-                    
+
                     m_contents.push_back(sp_Record);
 
                 } // looping through inbox.
@@ -1907,7 +1909,7 @@ bool OTRecordList::Populate()
                     OTTransaction* pBoxTrans = it.second;
                     OT_ASSERT(nullptr != pBoxTrans);
                     bool bOutgoing = false;
-                    
+
                     // Let's say Alice sends a payment plan to Bob, and then Bob
                     // activates it. Alice will receive a notice, via her Nymbox,
                     // which will be placed in her Nym record box. (The pending outgoing
@@ -1924,7 +1926,7 @@ bool OTRecordList::Populate()
                     // -------------------------------------------
                     bool bHasSuccess = false;
                     bool bIsSuccess  = false;
-                    
+
                     bool bCanceled   = false;
                     // (A transaction object containing a notice of a success is not the same thing
                     // as a transaction object containing a successful transaction. In the latter
@@ -1941,9 +1943,9 @@ bool OTRecordList::Populate()
                                           // (depending on whether it was originally incoming or outgoing.)
                     std::string str_other_nym_id;
                     std::string str_other_acct_id;
-                    
+
                     OTRecord::OTRecordType recordType = OTRecord::Instrument;
-                    
+
                     if (!pBoxTrans->IsAbbreviated())
                     {
                         // We ignore the return value of GetSuccess, since it's not
@@ -1954,7 +1956,7 @@ bool OTRecordList::Populate()
                         if (OTTransaction::notice == pBoxTrans->GetType())
                         {
                             recordType = OTRecord::Notice;
-                            
+
                             if (pBoxTrans->IsCancelled())
                                 bCanceled = true;
                         }
@@ -1994,7 +1996,7 @@ bool OTRecordList::Populate()
 
                                     str_name = strNameTemp.Get();
                                     str_other_nym_id = str_recipient_id;
-                                    
+
                                     if (pBoxTrans->GetRecipientAcctIDForDisplay(theRecipientAcctID))
                                     {
                                         const String strRecipientAcctID(theRecipientAcctID);
@@ -2005,7 +2007,7 @@ bool OTRecordList::Populate()
                             else // str_nym_id IS NOT str_sender_id. (Therefore we want sender.)
                             {    // In this case, some OTHER Nym is the sender, so it must have been incoming.
                                  // (And bOutgoing is already false.)
-                                
+
                                 if (OTTransaction::notice == pBoxTrans->GetType())
                                     bOutgoing = true; // Payment Plan "recipient" of funds (merchant) is the sender of the plan.
                                                       // TODO: Smart contracts?
@@ -2021,7 +2023,7 @@ bool OTRecordList::Populate()
 
                                 str_name = strNameTemp.Get();
                                 str_other_nym_id = str_sender_id;
-                                
+
                                 if (pBoxTrans->GetSenderAcctIDForDisplay(theSenderAcctID))
                                 {
                                     const String strSenderAcctID(theSenderAcctID);
@@ -2087,7 +2089,7 @@ bool OTRecordList::Populate()
 
                     int64_t lPaymentInstrumentTransNum        = 0,
                             lPaymentInstrumentTransNumDisplay = 0;
-                    
+
                     if (pBoxTrans->IsAbbreviated())
                     {
                         str_type = pBoxTrans->GetTypeString(); // instrumentNotice, etc.
@@ -2104,7 +2106,7 @@ bool OTRecordList::Populate()
                     {
                         OTPayment* pPayment = GetInstrument(*pNym, nIndex, *pRecordbox); // ===> Returns financial instrument by index.
                         std::unique_ptr<OTPayment> thePaymentAngel(pPayment);
-                        
+
                         if (nullptr == pPayment) // then we treat it like it's abbreviated.
                         {
                             str_type = pBoxTrans->GetTypeString(); // instrumentNotice, etc.
@@ -2126,12 +2128,12 @@ bool OTRecordList::Populate()
                                 lPaymentInstrumentTransNum = lOpeningNum;
                             else
                                 pPayment->GetTransactionNum(lPaymentInstrumentTransNum);
-                            
+
                             pPayment->GetTransNumDisplay(lPaymentInstrumentTransNumDisplay);
-                            
+
                             if (lPaymentInstrumentTransNumDisplay <= 0)
                                 lPaymentInstrumentTransNumDisplay = lPaymentInstrumentTransNum;
-                            
+
                             pPayment->GetValidFrom(tValidFrom);
                             pPayment->GetValidTo(tValidTo);
 
@@ -2268,19 +2270,19 @@ bool OTRecordList::Populate()
                         true,      // IsRecord
                         false,     // IsReceipt,
                         recordType));
-                    
+
                     if (strContents.Exists())
                         sp_Record->SetContents(strContents.Get());
-                    
+
                     sp_Record->SetDateRange(tValidFrom, tValidTo);
                     sp_Record->SetBoxIndex(nIndex);
-                    
+
                     if (!str_memo.empty()) sp_Record->SetMemo(str_memo);
                     if (!str_other_nym_id.empty())
                         sp_Record->SetOtherNymID(str_other_nym_id);
                     if (!str_other_acct_id.empty())
                         sp_Record->SetOtherAccountID(str_other_acct_id);
-                    
+
                     if (lPaymentInstrumentTransNumDisplay > 0)
                         sp_Record->SetTransNumForDisplay(lPaymentInstrumentTransNumDisplay);
                     else
@@ -2289,15 +2291,15 @@ bool OTRecordList::Populate()
 
                     if (bHasSuccess)
                         sp_Record->SetSuccess(bIsSuccess);
-                    
+
                     if (bCanceled)
                         sp_Record->SetCanceled();
-                    
+
 //                    otErr << "DEBUGGING! RECORD LIST: Added " << (bOutgoing ? "sent": "received") << " payment record: " <<
 //                    pBoxTrans->GetTypeString() << "\n str_nym_id: " << str_nym_id << "\n str_other_nym_id: " << str_other_nym_id <<
 //                    "\n pBoxTrans->GetTransactionNum(): " << pBoxTrans->GetTransactionNum() <<
 //                    "\n pBoxTrans->GetReferenceNumForDisplay()" << pBoxTrans->GetReferenceNumForDisplay() << "\n";
-                    
+
                     m_contents.push_back(sp_Record);
 
                 } // Loop through Recordbox
@@ -2325,7 +2327,7 @@ bool OTRecordList::Populate()
                     OTTransaction* pBoxTrans = it.second;
                     OT_ASSERT(nullptr != pBoxTrans);
                     bool bOutgoing = false;
-                    
+
                     // Let's say Alice sends a payment plan to Bob, and then Bob
                     // activates it. Alice will receive a notice, via her Nymbox,
                     // which will be placed in her Nym record box. (The pending outgoing
@@ -2339,7 +2341,7 @@ bool OTRecordList::Populate()
                     // -------------------------------------------
                     bool bHasSuccess = false;
                     bool bIsSuccess  = false;
-                    
+
                     bool bCanceled   = false;
                     // (A transaction object containing a notice of a success is not the same thing
                     // as a transaction object containing a successful transaction. In the latter
@@ -2367,11 +2369,11 @@ bool OTRecordList::Populate()
                         // detailed enough for our needs here.
                         //
                         pBoxTrans->GetSuccess(&bHasSuccess, &bIsSuccess);
-                        
+
                         if (OTTransaction::notice == pBoxTrans->GetType())
                         {
                             recordType = OTRecord::Notice;
-                         
+
                             if (pBoxTrans->IsCancelled())
                                 bCanceled = true;
                         }
@@ -2412,7 +2414,7 @@ bool OTRecordList::Populate()
 
                                     str_name = strNameTemp.Get();
                                     str_other_nym_id = str_recipient_id;
-                                    
+
                                     if (pBoxTrans->GetRecipientAcctIDForDisplay(theRecipientAcctID))
                                     {
                                         const String strRecipientAcctID(theRecipientAcctID);
@@ -2439,7 +2441,7 @@ bool OTRecordList::Populate()
 
                                 str_name = strNameTemp.Get();
                                 str_other_nym_id = str_sender_id;
-                                
+
                                 if (pBoxTrans->GetSenderAcctIDForDisplay(theSenderAcctID))
                                 {
                                     const String strSenderAcctID(theSenderAcctID);
@@ -2460,7 +2462,7 @@ bool OTRecordList::Populate()
                             {                                         // (Therefore we want str_recipient_id.)
                                 // If Nym is not the recipient, then he must be the sender.
                                 // (Therefore it must be outgoing.)
-                                
+
                                 if (OTTransaction::notice == pBoxTrans->GetType())
                                     bOutgoing = false; // Payment Plan "sender" of funds (payer) is the recipient of the plan.
                                                        // TODO: Smart contracts?
@@ -2476,7 +2478,7 @@ bool OTRecordList::Populate()
 
                                 str_name = strNameTemp.Get();
                                 str_other_nym_id = str_recipient_id;
-                                
+
                                 if (pBoxTrans->GetRecipientAcctIDForDisplay(theRecipientAcctID))
                                 {
                                     const String strRecipientAcctID(theRecipientAcctID);
@@ -2506,7 +2508,7 @@ bool OTRecordList::Populate()
                     String strContents;   // Instrument contents.
 
                     int64_t lPaymentInstrumentTransNum = 0, lPaymentInstrumentTransNumDisplay = 0;
-                    
+
                     if (pBoxTrans->IsAbbreviated())
                     {
                         str_type = pBoxTrans->GetTypeString(); // instrumentNotice, etc.
@@ -2523,7 +2525,7 @@ bool OTRecordList::Populate()
                     {
                         OTPayment* pPayment = GetInstrument(*pNym, nIndex, *pExpiredbox); //===> Returns financial instrument by index.
                         std::unique_ptr<OTPayment> thePaymentAngel(pPayment);
-                        
+
                         if (nullptr == pPayment) // then we treat it like it's abbreviated.
                         {
                             str_type = pBoxTrans->GetTypeString(); // instrumentNotice, etc.
@@ -2544,12 +2546,12 @@ bool OTRecordList::Populate()
                                 lPaymentInstrumentTransNum = lOpeningNum;
                             else
                                 pPayment->GetTransactionNum(lPaymentInstrumentTransNum);
-                            
+
                             pPayment->GetTransNumDisplay(lPaymentInstrumentTransNumDisplay);
-                            
+
                             if (lPaymentInstrumentTransNumDisplay <= 0)
                                 lPaymentInstrumentTransNumDisplay = lPaymentInstrumentTransNum;
-                            
+
                             pPayment->GetValidFrom(tValidFrom);
                             pPayment->GetValidTo(tValidTo);
 
@@ -2674,7 +2676,7 @@ bool OTRecordList::Populate()
                           << (bOutgoing ? "(sent)" : "(received)")
                           << " (str_type: " << str_type.c_str() << ")\n";
 
-                    shared_ptr_OTRecord sp_Record(new OTRecord(*this, 
+                    shared_ptr_OTRecord sp_Record(new OTRecord(*this,
                         it_server, *p_str_asset_type, *p_str_asset_name,
                         str_nym_id,     // This is the Nym WHOSE BOX IT IS.
                         *p_str_account, // This is the Nym's account for this box. (Blank for incoming, set for outgoing.)
@@ -2690,17 +2692,17 @@ bool OTRecordList::Populate()
                         recordType));
                     if (strContents.Exists())
                         sp_Record->SetContents(strContents.Get());
-                    
+
                     sp_Record->SetDateRange(tValidFrom, tValidTo);
                     sp_Record->SetExpired();
                     sp_Record->SetBoxIndex(nIndex);
-                    
+
                     if (!str_memo.empty()) sp_Record->SetMemo(str_memo);
                     if (!str_other_nym_id.empty())
                         sp_Record->SetOtherNymID(str_other_nym_id);
                     if (!str_other_acct_id.empty())
                         sp_Record->SetOtherAccountID(str_other_acct_id);
-                    
+
                     if (lPaymentInstrumentTransNumDisplay > 0)
                         sp_Record->SetTransNumForDisplay(lPaymentInstrumentTransNumDisplay);
                     else
@@ -2709,10 +2711,10 @@ bool OTRecordList::Populate()
 
                     if (bHasSuccess)
                         sp_Record->SetSuccess(bIsSuccess);
-                    
+
                     if (bCanceled)
                         sp_Record->SetCanceled();
-                    
+
                     m_contents.push_back(sp_Record);
 
                 } // Loop through ExpiredBox
@@ -2831,14 +2833,14 @@ bool OTRecordList::Populate()
 
                 bool bHasSuccess = false;
                 bool bIsSuccess  = false;
-                
+
                 if (!pBoxTrans->IsAbbreviated())
                 {
                     String strMemo;
 
                     if (pBoxTrans->GetMemo(strMemo))
                         str_memo = strMemo.Get();
-                    
+
                     if (OTTransaction::pending == pBoxTrans->GetType()) {
                         // NOTE: REMOVE THE BELOW CODE. (Found a better way,
                         // above this block.)
@@ -3015,7 +3017,7 @@ bool OTRecordList::Populate()
                               : "receipt") << " (str_type: " << str_type.c_str()
                       << ")\n";
 
-                shared_ptr_OTRecord sp_Record(new OTRecord(*this, 
+                shared_ptr_OTRecord sp_Record(new OTRecord(*this,
                     *pstr_notary_id, *pstr_instrument_definition_id,
                     *pstr_asset_name,
                     *pstr_nym_id,   // This is the Nym WHOSE BOX IT IS.
@@ -3038,26 +3040,26 @@ bool OTRecordList::Populate()
                     (OTTransaction::pending == pBoxTrans->GetType())
                         ? OTRecord::Transfer
                         : OTRecord::Receipt));
-                
+
                 const String strContents(*pBoxTrans);
                 sp_Record->SetContents(strContents.Get());
                 sp_Record->SetDateRange(tValidFrom, tValidTo);
                 sp_Record->SetBoxIndex(nInboxIndex);
-                
+
                 if (bCanceled) sp_Record->SetCanceled();
                 if (!str_memo.empty()) sp_Record->SetMemo(str_memo);
                 if (!str_other_nym_id.empty())
                     sp_Record->SetOtherNymID(str_other_nym_id);
                 if (!str_other_acct_id.empty())
                     sp_Record->SetOtherAccountID(str_other_acct_id);
-                
+
                 sp_Record->SetTransNumForDisplay(
                     pBoxTrans->GetReferenceNumForDisplay());
                 sp_Record->SetTransactionNum(pBoxTrans->GetTransactionNum());
-                
+
                 if (bHasSuccess)
                     sp_Record->SetSuccess(bIsSuccess);
-                
+
 //                otErr << "DEBUGGING! Added " << pBoxTrans->GetTypeString() <<
 //                "\n pBoxTrans->GetTransactionNum(): " << pBoxTrans->GetTransactionNum() <<
 //                "\n pBoxTrans->GetReferenceNumForDisplay()" << pBoxTrans->GetReferenceNumForDisplay() << "\n";
@@ -3199,7 +3201,7 @@ bool OTRecordList::Populate()
                       << " outgoing transfer (str_type: " << str_type.c_str()
                       << ").\n";
 
-                shared_ptr_OTRecord sp_Record(new OTRecord(*this, 
+                shared_ptr_OTRecord sp_Record(new OTRecord(*this,
                     *pstr_notary_id, *pstr_instrument_definition_id,
                     *pstr_asset_name,
                     *pstr_nym_id,   // This is the Nym WHOSE BOX IT IS.
@@ -3228,12 +3230,12 @@ bool OTRecordList::Populate()
                 sp_Record->SetTransNumForDisplay(
                     pBoxTrans->GetReferenceNumForDisplay());
                 sp_Record->SetTransactionNum(pBoxTrans->GetTransactionNum());
-                
+
 //                otErr << "DEBUGGING! Added outgoing asset account record: " <<
 //                pBoxTrans->GetTypeString() <<
 //                "\n pBoxTrans->GetTransactionNum(): " << pBoxTrans->GetTransactionNum() <<
 //                "\n pBoxTrans->GetReferenceNumForDisplay()" << pBoxTrans->GetReferenceNumForDisplay() << "\n";
-                
+
 
                 m_contents.push_back(sp_Record);
             }
@@ -3269,15 +3271,15 @@ bool OTRecordList::Populate()
                 std::string str_other_nym_id;
                 std::string str_other_acct_id;
                 std::string str_memo;
-                
+
                 bool bHasSuccess = false;
                 bool bIsSuccess  = false;
-                
+
                 int64_t lClosingNum = 0;
                 const bool bIsFinalReceipt = (OTTransaction::finalReceipt == pBoxTrans->GetType());
                 if (bIsFinalReceipt)
                     lClosingNum = pBoxTrans->GetClosingNum();
-                
+
                 if (!pBoxTrans->IsAbbreviated())
                 {
                     if (pBoxTrans->GetType() != OTTransaction::pending)
@@ -3602,7 +3604,7 @@ bool OTRecordList::Populate()
                 // FYI, for Receipts we don't say "sent transferReceipt",
                 // we just say "transferReceipt."
 
-                shared_ptr_OTRecord sp_Record(new OTRecord(*this, 
+                shared_ptr_OTRecord sp_Record(new OTRecord(*this,
                     *pstr_notary_id, *pstr_instrument_definition_id,
                     *pstr_asset_name,
                     *pstr_nym_id,   // This is the Nym WHOSE BOX IT IS.
@@ -3637,16 +3639,16 @@ bool OTRecordList::Populate()
                 sp_Record->SetTransNumForDisplay(
                     pBoxTrans->GetReferenceNumForDisplay());
                 sp_Record->SetTransactionNum(pBoxTrans->GetTransactionNum());
-                
+
                 if (bHasSuccess)
                     sp_Record->SetSuccess(bIsSuccess);
-                
+
                 if (bIsFinalReceipt)
                 {
                     sp_Record->SetFinalReceipt();
                     sp_Record->SetClosingNum(lClosingNum);
                 }
-                
+
 //                otErr << "DEBUGGING! Added " << (bOutgoing ? "sent": "received") << " asset account record: " <<
 //                pBoxTrans->GetTypeString() <<
 //                "\n pBoxTrans->GetTransactionNum(): " << pBoxTrans->GetTransactionNum() <<
@@ -3758,7 +3760,7 @@ void OTRecordList::AddSpecialMsg(
             }
         }
     }
-    shared_ptr_OTRecord sp_Record(new OTRecord(*this, 
+    shared_ptr_OTRecord sp_Record(new OTRecord(*this,
         *p_str_server, *p_str_asset_type, *p_str_asset_name,
         *p_str_nym_id,  // This is "me" (the sender Nym, if outgoing, or
                         // recipient, if incoming.)

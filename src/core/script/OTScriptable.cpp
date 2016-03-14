@@ -2363,7 +2363,7 @@ bool OTScriptable::Compare(OTScriptable& rhs) const
 // account IDs
 // or Nym IDs have been added to it (which would alter the hash of any normal
 // contract
-// such as an OTAssetContract.)
+// such as an OTUnitDefinition.)
 //
 void OTScriptable::CalculateContractID(Identifier& newID) const
 {

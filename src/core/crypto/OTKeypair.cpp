@@ -330,6 +330,7 @@ serializedAsymmetricKey OTKeypair::Serialize(bool privateKey) const
     OT_ASSERT(m_pkeyPublic);
 
     if (privateKey) {
+        OT_ASSERT(m_pkeyPrivate);
         return m_pkeyPrivate->Serialize();
     } else {
         return m_pkeyPublic->Serialize();

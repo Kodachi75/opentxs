@@ -168,8 +168,8 @@ processNymbox is that it doesn't require such a number.
                     // PAYEE) in the place where we normally would only claw back the closing number.
  smartContract,     // This contains an opening number for each party, and a closing number for each asset account.
 
- 
- 
+
+
  exchangeBasket,    // this transaction is an exchange in/out of a basketcurrency.
 
 
@@ -1162,7 +1162,7 @@ bool OTTransaction::HarvestClosingNumbers(
 // automatically saved to a disputes folder, etc.
 //
 bool OTTransaction::VerifyBalanceReceipt(
-    Nym& SERVER_NYM, // For verifying a signature.
+    const Nym& SERVER_NYM, // For verifying a signature.
     Nym& THE_NYM)    // transaction numbers issued according to nym must
                      // match this.
 // OTLedger& THE_INBOX,    // All inbox items on *this must also be found in
@@ -3652,11 +3652,11 @@ bool OTTransaction::GetSuccess(bool * pbHasSuccess/*=nullptr*/, // Just for thos
         }
 
         const bool bReturnValue = (bFoundABalanceAgreement && bFoundAnActionItem);
-        
+
         // If we didn't even have a balance agreement or action item, then we couldn't
         // say for sure whether or not it was a "success". (We just don't know.)
         *pbHasSuccess = bReturnValue;
-        
+
         // In the above switch, if an Item::rejection was found, then we KNOW we found the success
         // status, and we KNOW it failed. (And we returned already.) Whereas here, we only know
         // whether we have the success status if *pbHasSuccess is true. And IF it is, then we KNOW
@@ -3709,10 +3709,10 @@ bool OTTransaction::GetSuccess(bool * pbHasSuccess/*=nullptr*/, // Just for thos
             {
                 *pbHasSuccess = true; // We DEFINITELY have a success value (of false.) So true/false here.
 //              *pbIsSuccess  = false; // Already set above.
-                
+
                 return false;
             }
-                
+
             if (bFoundAnActionItem)
                 break;
             else
@@ -3773,7 +3773,7 @@ bool OTTransaction::GetSuccess(bool * pbHasSuccess/*=nullptr*/, // Just for thos
             {
                 *pbHasSuccess = true; // We DEFINITELY have a success value (of false.) So true/false here.
 //              *pbIsSuccess  = false; // Already set above.
-                
+
                 return false;
             }
 
@@ -3833,7 +3833,7 @@ bool OTTransaction::GetSuccess(bool * pbHasSuccess/*=nullptr*/, // Just for thos
         // the activation of payment plans and smart contracts.
         //
         case Item::notice:
-                
+
             if (Item::acknowledgement == pItem->GetStatus())
             {
                 *pbHasSuccess = true;
@@ -3857,18 +3857,18 @@ bool OTTransaction::GetSuccess(bool * pbHasSuccess/*=nullptr*/, // Just for thos
     }
 
     const bool bReturnValue = (bFoundABalanceAgreement && bFoundAnActionItem);
-    
+
     // If we didn't even have a balance agreement or action item, then we couldn't
     // say for sure whether or not it was a "success". (We just don't know.)
     *pbHasSuccess = bReturnValue;
-    
+
     // In the above switch, if an Item::rejection was found, then we KNOW we found the success
     // status, and we KNOW it failed. (And we returned already.) Whereas here, we only know
     // whether we have the success status if *pbHasSuccess is true. And IF it is, then we KNOW
     // the item is acknowledged, since we would already have returned above if it had been rejected.
     if (*pbHasSuccess)
         *pbIsSuccess  = true; // If it were false we would already have returned above.
-    
+
     return bReturnValue;
 }
 
@@ -5802,15 +5802,15 @@ int64_t OTTransaction::GetReferenceNumForDisplay()
              I guess I'd think that an instrumentNotice containing an incoming
              cheque should have the cheque# as its "in reference to" number.
              Makes sense, right?
-             
+
              ...EXCEPT THAT CHEQUE IS ENCRYPTED. The payload on an instrumentNotice
              is encrypted. So unless we had the recipient's private key inside this
              function, which we don't, we have no way of decrypting that cheque and
              returning the "Display" number that the user actually wants to see.
-             
+
              TODO long term: Add a Nym* parameter so we have the OPTION here to
              decrypt the payload and return the correct data.
-             
+
              In the meantime, I don't need to change anything here, since OTRecordList
              decrypts the payloads already, and has a pPayment* now where I can get the
              actual instrument's transaction number. So I will harvest it in OTRecordList
@@ -5820,7 +5820,7 @@ int64_t OTTransaction::GetReferenceNumForDisplay()
         lReferenceNum = GetReferenceToNum();
         break;
 
-            
+
     case OTTransaction::paymentReceipt:
     case OTTransaction::finalReceipt: {
         lReferenceNum = GetReferenceToNum();
@@ -5830,21 +5830,21 @@ int64_t OTTransaction::GetReferenceNumForDisplay()
         if (strRef.Exists())
         {
             std::unique_ptr<OTCronItem> pCronItem(OTCronItem::NewCronItem(strRef));
-            
+
             if (pCronItem)
             {
                 lReferenceNum = pCronItem->GetTransactionNum();
                 // -------------------------------------------
                 OTPaymentPlan   * pPlan          = dynamic_cast<OTPaymentPlan  *>(pCronItem.get());
                 OTSmartContract * pSmartContract = dynamic_cast<OTSmartContract*>(pCronItem.get());
-                
+
                 if (nullptr != pPlan) {
                     lReferenceNum = pPlan->GetRecipientOpeningNum();
                 }
                 else if (nullptr != pSmartContract) {
                     const std::vector<int64_t> & openingNumsInOrderOfSigning =
                         pSmartContract->openingNumsInOrderOfSigning();
-                    
+
                     if (openingNumsInOrderOfSigning.size() > 0)
                     lReferenceNum = openingNumsInOrderOfSigning[0];
                 }
@@ -5852,7 +5852,7 @@ int64_t OTTransaction::GetReferenceNumForDisplay()
             }
         }
         } break;
-            
+
     // A transferReceipt ACTUALLY references the acceptPending (recipient's
     // trans#) that accepted it.
     // But I don't care about the recipient's transaction #s! This function is
@@ -5927,7 +5927,7 @@ bool OTTransaction::GetSenderNymIDForDisplay(Identifier& theReturnID)
     GetReferenceString(strReference);
 
     if (strReference.GetLength() < 2) return false;
-    
+
     switch (GetType())
     {
     case OTTransaction::notice: // for paymentPlans AND smartcontracts.
@@ -5955,7 +5955,7 @@ bool OTTransaction::GetSenderNymIDForDisplay(Identifier& theReturnID)
             if (nullptr != pSmart) // if it's a smart contract...
             {
                 if (!pSmart->GetLastSenderNymID().Exists()) return false;
-                
+
                 // WARNING: This may not be correct. I believe GetLastSenderNymID refers to
                 // the most recent Nym who has PAID the smart contract, versus the most recent
                 // Nym who has SENT the smart contract. So later on, if you have trouble and
@@ -6205,7 +6205,7 @@ bool OTTransaction::GetRecipientNymIDForDisplay(Identifier& theReturnID)
                 // to guide you  :-)
                 // So why is this code like this in the first place? Simple:
                 // I just copied it from the paymentReceipt case below.
-                
+
                 theReturnID.SetString(pSmart->GetLastRecipientNymID());
                 return !theReturnID.IsEmpty();
             }

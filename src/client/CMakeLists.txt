@@ -151,7 +151,7 @@ else()
   )
 endif()
 
-target_link_libraries(opentxs-client PUBLIC opentxs-ext opentxs-cash opentxs-basket opentxs-core opentxs-storage PRIVATE czmq_local)
+target_link_libraries(opentxs-client PUBLIC opentxs-ext opentxs-cash opentxs-core opentxs-storage PRIVATE czmq_local)
 set_lib_property(opentxs-client)
 
 add_library(opentxs-proto SHARED IMPORTED)

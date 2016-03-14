@@ -49,7 +49,7 @@ namespace opentxs
 {
 
 class Account;
-class AssetContract;
+class UnitDefinition;
 class Ledger;
 class ServerContract;
 class OTWallet;
@@ -136,7 +136,7 @@ public:
         return m_MessageOutbuffer;
     }
 
-    void ProcessMessageOut(ServerContract* pServerContract, Nym* pNym,
+    void ProcessMessageOut(const ServerContract* pServerContract, Nym* pNym,
                            const Message& theMessage);
     bool ProcessInBuffer(const Message& theServerReply) const;
 
@@ -145,7 +145,7 @@ public:
                                       const ServerContract& theServer,
                                       const Account* pAccount = nullptr,
                                       int64_t lTransactionAmount = 0,
-                                      AssetContract* pMyAssetContract = nullptr,
+                                      const UnitDefinition* pMyUnitDefinition = nullptr,
                                       const Identifier* pHisNymID = nullptr,
                                       const Identifier* pHisAcctID = nullptr);
 

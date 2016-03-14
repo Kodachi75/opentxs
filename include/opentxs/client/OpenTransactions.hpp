@@ -42,6 +42,7 @@
 #include <opentxs/core/util/Common.hpp>
 #include <opentxs/core/Nym.hpp>
 #include <opentxs/core/String.hpp>
+#include "opentxs/core/app/Wallet.hpp"
 #include <opentxs/core/crypto/NymParameters.hpp>
 
 #include <memory>
@@ -54,8 +55,10 @@ namespace opentxs
 class Settings;
 class OT_API;
 class Account;
-class AssetContract;
+class UnitDefinition;
+class CurrencyContract;
 class Basket;
+class BasketContract;
 class Cheque;
 class OTClient;
 class OTEnvelope;
@@ -129,11 +132,11 @@ private:
     EXPORT bool Init();    // Per instance. (called automaticly by constructor)
     EXPORT bool Cleanup(); // Per instance. (called automaticly by constructor)
 
-    int32_t SendMessage(ServerContract* pServerContract, Nym* pNym,
+    int32_t SendMessage(const ServerContract* pServerContract, Nym* pNym,
                         Message& message, int64_t requestNum) const;
 
 public:
-    void SendMessage(ServerContract* pServerContract, Nym* pNym,
+    void SendMessage(const ServerContract* pServerContract, Nym* pNym,
                      Message& message) const;
 
     EXPORT bool IsInitialized() const
@@ -167,58 +170,71 @@ public:
     // Reading data about the local wallet.. presumably already loaded.
 
     EXPORT int32_t GetNymCount() const;
-    EXPORT int32_t GetServerCount() const;
-    EXPORT int32_t GetAssetTypeCount() const;
     EXPORT int32_t GetAccountCount() const;
 
     EXPORT bool GetNym(int32_t iIndex, Identifier& NYM_ID,
                        String& NYM_NAME) const;
-    EXPORT bool GetServer(int32_t iIndex, Identifier& THE_ID,
-                          String& THE_NAME) const;
-    EXPORT bool GetAssetType(int32_t iIndex, Identifier& THE_ID,
-                             String& THE_NAME) const;
     EXPORT bool GetAccount(int32_t iIndex, Identifier& THE_ID,
                            String& THE_NAME) const;
     // In this case, the ID is input, the pointer is output.
     // Gets the data from Wallet.
     EXPORT Nym* GetNym(const Identifier& NYM_ID,
                        const char* szFuncName = nullptr) const;
-    EXPORT ServerContract* GetServer(const Identifier& THE_ID,
+    EXPORT ConstServerContract GetServer(const Identifier& THE_ID,
                                        const char* szFuncName = nullptr) const;
-    EXPORT AssetContract* GetAssetType(const Identifier& THE_ID,
+    EXPORT ConstUnitDefinition GetAssetType(const Identifier& THE_ID,
                                        const char* szFuncName = nullptr) const;
+    EXPORT const BasketContract* GetBasketContract(
+        const Identifier& THE_ID,
+        const char* szFuncName = nullptr) const;
     EXPORT Account* GetAccount(const Identifier& THE_ID,
                                const char* szFuncName = nullptr) const;
 
     EXPORT Nym* GetNymByIDPartialMatch(const std::string PARTIAL_ID,
                                        const char* szFuncName = nullptr) const;
-    EXPORT ServerContract* GetServerContractPartialMatch(
-        const std::string PARTIAL_ID, const char* szFuncName = nullptr) const;
-    EXPORT AssetContract* GetAssetContractPartialMatch(
-        const std::string PARTIAL_ID, const char* szFuncName = nullptr) const;
     EXPORT Account* GetAccountPartialMatch(
         const std::string PARTIAL_ID, const char* szFuncName = nullptr) const;
-    EXPORT Nym* GetOrLoadPublicNym(const Identifier& NYM_ID,
-                                   const char* szFuncName = nullptr) const;
     EXPORT Nym* GetOrLoadPrivateNym(
         const Identifier& NYM_ID, bool bChecking = false,
         const char* szFuncName = nullptr,
         const OTPasswordData* pPWData = nullptr,
         const OTPassword* pImportPassword = nullptr) const;
-    EXPORT Nym* GetOrLoadNym(const Identifier& NYM_ID, bool bChecking = false,
+    EXPORT const Nym* GetOrLoadNym(const Identifier& NYM_ID, bool bChecking = false,
                              const char* szFuncName = nullptr,
                              const OTPasswordData* pPWData = nullptr) const;
-    EXPORT proto::ContactData GetContactData(const Nym& fromNym) const;
+    EXPORT const Nym* reloadAndGetNym(
+        const Identifier& NYM_ID,
+        bool bChecking = false,
+        const char* szFuncName = nullptr,
+        const OTPasswordData* pPWData = nullptr) const;
+    EXPORT Nym* reloadAndGetPrivateNym(
+        const Identifier& NYM_ID,
+        bool bChecking = false,
+        const char* szFuncName = nullptr,
+        const OTPasswordData* pPWData = nullptr) const;
+    EXPORT std::shared_ptr<proto::ContactData> GetContactData(
+        const Nym& fromNym) const;
     EXPORT ClaimSet GetClaims(const Nym& fromNym) const;
     EXPORT bool SetContactData(Nym& onNym,
                                const proto::ContactData&) const;
-    EXPORT std::set<uint32_t> GetContactSections (const uint32_t version = 1);
-    EXPORT std::set<uint32_t> GetContactSectionTypes (const uint32_t section, const uint32_t version = 1);
-    EXPORT std::string GetContactSectionName (const uint32_t section, std::string lang = "en");
-    EXPORT std::string GetContactTypeName (const uint32_t type, std::string lang = "en");
-    EXPORT std::string GetContactAttributeName (const uint32_t type, std::string lang = "en");
-    EXPORT static std::string NymIDFromPaymentCode(const std::string& paymentCode);
-
+    EXPORT bool SetClaim(Nym& onNym, Claim& claim) const;
+    EXPORT bool DeleteClaim(Nym& onNym, std::string& claimID) const;
+    EXPORT std::set<uint32_t> GetContactSections(const uint32_t version = 1);
+    EXPORT std::set<uint32_t> GetContactSectionTypes(
+        const uint32_t section,
+        const uint32_t version = 1);
+    EXPORT std::string GetContactSectionName(
+        const uint32_t section,
+        std::string lang = "en");
+    EXPORT std::string GetContactTypeName(
+        const uint32_t type,
+        std::string lang = "en");
+    EXPORT std::string GetContactAttributeName(
+        const uint32_t type,
+        std::string lang = "en");
+    EXPORT uint32_t GetReciprocalRelationship(const uint32_t relationship);
+    EXPORT static std::string NymIDFromPaymentCode(
+        const std::string& paymentCode);
     EXPORT VerificationSet GetVerificationSet(const Nym& fromNym) const;
     EXPORT VerificationSet SetVerification(
         Nym& onNym,
@@ -229,7 +245,6 @@ public:
         const int64_t start = 0,
         const int64_t end = 0,
         const OTPasswordData* pPWData = nullptr) const;
-
     EXPORT Account* GetOrLoadAccount(const Nym& theNym,
                                      const Identifier& ACCT_ID,
                                      const Identifier& NOTARY_ID,
@@ -256,8 +271,6 @@ public:
                                const String& STR_NEW_NAME) const;
     // Accessing local storage...
     // (Caller responsible to delete.)
-    EXPORT Nym* LoadPublicNym(const Identifier& NYM_ID,
-                              const char* szFuncName = nullptr) const;
     EXPORT Nym* LoadPrivateNym(
         const Identifier& NYM_ID, bool bChecking = false,
         const char* szFuncName = nullptr,
@@ -285,10 +298,6 @@ public:
         const Identifier& INSTRUMENT_DEFINITION_ID) const;
     EXPORT bool Wallet_CanRemoveNym(const Identifier& NYM_ID) const;
     EXPORT bool Wallet_CanRemoveAccount(const Identifier& ACCOUNT_ID) const;
-
-    EXPORT bool Wallet_RemoveServer(const Identifier& NOTARY_ID) const;
-    EXPORT bool Wallet_RemoveAssetType(
-        const Identifier& INSTRUMENT_DEFINITION_ID) const;
     EXPORT bool Wallet_RemoveNym(const Identifier& NYM_ID) const;
     // OT has the capability to export a Nym (normally stored in several files)
     // as an encoded
@@ -555,10 +564,6 @@ public:
         const String* pstrDisplay = nullptr) const;
     EXPORT Mint* LoadMint(const Identifier& NOTARY_ID,
                           const Identifier& INSTRUMENT_DEFINITION_ID) const;
-    EXPORT AssetContract* LoadAssetContract(
-        const Identifier& INSTRUMENT_DEFINITION_ID) const;
-    EXPORT ServerContract* LoadServerContract(
-        const Identifier& NOTARY_ID) const;
     EXPORT bool IsBasketCurrency(
         const Identifier& BASKET_INSTRUMENT_DEFINITION_ID) const;
 
@@ -746,26 +751,14 @@ public:
                                   const Identifier& NYM_ID,
                                   const Identifier& ACCT_ID) const;
 
-    EXPORT Basket* GenerateBasketCreation(
-        const Identifier& NYM_ID,
-        int64_t MINIMUM_TRANSFER) const; // Must be above zero. If <= 0,
-                                         // defaults to 10.
-
     EXPORT bool AddBasketCreationItem(
-        const Identifier& NYM_ID,                   // for signature.
-        Basket& theBasket,                          // created in above call.
-        const Identifier& INSTRUMENT_DEFINITION_ID, // Adding an instrument
-                                                    // definition to
-                                                    // the new
-                                                    // basket.
-        int64_t MINIMUM_TRANSFER) const; // The amount of the instrument
-                                         // definition
-                                         // that is
-                                         // in the basket.
+        proto::UnitDefinition& basketTemplate,
+        const String& currencyID,
+        const uint64_t weight) const;
 
     EXPORT int32_t issueBasket(const Identifier& NOTARY_ID,
                                const Identifier& NYM_ID,
-                               const String& BASKET_INFO) const;
+                               const proto::UnitDefinition& basket) const;
 
     EXPORT Basket* GenerateBasketExchange(
         const Identifier& NOTARY_ID, const Identifier& NYM_ID,
@@ -1158,9 +1151,6 @@ public:
                                   const Identifier& NYM_ID,
                                   const Identifier& ASSET_ACCT_ID,
                                   const int64_t& lTransactionNum) const;
-
-    EXPORT void AddServerContract(ServerContract* pContract) const;
-    EXPORT void AddAssetContract(const AssetContract& theContract) const;
 
 private:
     bool LoadConfigFile();

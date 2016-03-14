@@ -36,53 +36,45 @@
  *
  ************************************************************/
 
-#ifndef OPENTXS_CORE_SIGNABLE_HPP
-#define OPENTXS_CORE_SIGNABLE_HPP
+#ifndef OPENTXS_CORE_SECURITYCONTRACT_HPP
+#define OPENTXS_CORE_SECURITYCONTRACT_HPP
 
-#include <memory>
-
-#include <opentxs-proto/verify/VerifyCredentials.hpp>
-
-#include <opentxs/core/Identifier.hpp>
-#include <opentxs/core/String.hpp>
+#include "opentxs/core/contract/UnitDefinition.hpp"
 
 namespace opentxs
 {
 
-typedef std::shared_ptr<proto::Signature> SerializedSignature;
-typedef std::list<SerializedSignature> Signatures;
+class Nym;
 
-class Signable
+class SecurityContract : public UnitDefinition
 {
 private:
-    typedef Signable ot_super;
+    typedef UnitDefinition ot_super;
+    friend ot_super;
 
-protected:
-    Identifier id_;
-    Signatures signatures_;
-    uint32_t version_ = 0;
-    String conditions_; // Human-readable portion
+    std::string issue_date_;
 
-    // Calculate identifier
-    virtual Identifier GetID() const = 0;
-    // Calculate and unconditionally set id_
-    bool CalculateID() { id_ = GetID(); return true; }
-    // Calculate the ID and verify that it matches the existing id_ value
-    bool CheckID() const { return (GetID() == id_); }
+    SecurityContract(
+        const ConstNym& nym,
+        const proto::UnitDefinition serialized);
+    SecurityContract(
+        const ConstNym& nym,
+        const std::string& shortname,
+        const std::string& name,
+        const std::string& symbol,
+        const std::string& terms,
+        const std::string& date);
 
-    Signable() = default;
+    proto::UnitDefinition IDVersion() const override;
 
 public:
-    virtual String ID() const { return id_; }
-    virtual String Terms() const { return conditions_; }
+    EXPORT std::string IssueDate() const { return issue_date_; }
+    EXPORT proto::UnitType Type() const override
+        { return proto::UNITTYPE_SECURITY; }
 
-    virtual bool Save() const = 0;
-    virtual OTData Serialize() const = 0;
-    virtual bool Validate() const = 0;
-
-    virtual ~Signable() = default;
+    virtual ~SecurityContract() = default;
 };
 
 } // namespace opentxs
 
-#endif // OPENTXS_CORE_SIGNABLE_HPP
+#endif // OPENTXS_CORE_SECURITYCONTRACT_HPP

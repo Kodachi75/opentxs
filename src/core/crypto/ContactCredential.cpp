@@ -106,15 +106,16 @@ ContactCredential::ContactCredential(
     }
 }
 
-bool ContactCredential::GetContactData(proto::ContactData& contactData) const
+bool ContactCredential::GetContactData(
+        std::shared_ptr<proto::ContactData>& contactData) const
 {
     if (!data_) {
         return false;
     }
 
-    contactData = *data_;
+    contactData = std::make_shared<proto::ContactData>(*data_);
 
-    return true;
+    return bool(contactData);
 }
 
 serializedCredential ContactCredential::asSerialized(
