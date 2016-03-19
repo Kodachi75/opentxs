@@ -677,8 +677,7 @@ UnitDefinition* UnitDefinition::Create(
     const std::string& shortname,
     const std::string& name,
     const std::string& symbol,
-    const std::string& terms,
-    const std::string& date)
+    const std::string& terms)
 {
     std::unique_ptr<UnitDefinition> contract(
         new SecurityContract(
@@ -686,8 +685,7 @@ UnitDefinition* UnitDefinition::Create(
             shortname,
             name,
             symbol,
-            terms,
-            date));
+            terms));
 
     if (!contract) { return nullptr; }
 

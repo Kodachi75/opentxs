@@ -504,8 +504,7 @@ ConstUnitDefinition Wallet::UnitDefinition(
     const std::string& shortname,
     const std::string& name,
     const std::string& symbol,
-    const std::string& terms,
-    const std::string& date)
+    const std::string& terms)
 {
     std::string unit;
 
@@ -518,8 +517,7 @@ ConstUnitDefinition Wallet::UnitDefinition(
             shortname,
             name,
             symbol,
-            terms,
-            date));
+            terms));
         if (contract) {
 
             return (UnitDefinition(contract));

@@ -52,8 +52,6 @@ private:
     typedef UnitDefinition ot_super;
     friend ot_super;
 
-    std::string issue_date_;
-
     SecurityContract(
         const ConstNym& nym,
         const proto::UnitDefinition serialized);
@@ -62,13 +60,11 @@ private:
         const std::string& shortname,
         const std::string& name,
         const std::string& symbol,
-        const std::string& terms,
-        const std::string& date);
+        const std::string& terms);
 
     proto::UnitDefinition IDVersion() const override;
 
 public:
-    EXPORT std::string IssueDate() const { return issue_date_; }
     EXPORT proto::UnitType Type() const override
         { return proto::UNITTYPE_SECURITY; }
 

@@ -538,8 +538,7 @@ public:
         const std::string& shortname,
         const std::string& terms,
         const std::string& name,
-        const std::string& symbol,
-        const std::string& date) const;
+        const std::string& symbol) const;
 
     EXPORT std::string CalculateContractID(
         const std::string& str_Contract) const;

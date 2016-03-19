@@ -324,15 +324,13 @@ public:
      *    \param[in] name the official name of the unit of account
      *    \param[in] symbol symbol for the unit of account
      *    \param[in] terms human-readable terms and conditions
-     *    \param[in] date issue date for the security
      */
     ConstUnitDefinition UnitDefinition(
         const std::string& nymid,
         const std::string& shortname,
         const std::string& name,
         const std::string& symbol,
-        const std::string& terms,
-        const std::string& date);
+        const std::string& terms);
 
     ~Wallet() = default;
 };

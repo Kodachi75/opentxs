@@ -49,7 +49,6 @@ SecurityContract::SecurityContract(
     const ConstNym& nym,
     const proto::UnitDefinition serialized)
         : ot_super(nym, serialized)
-        , issue_date_(serialized.security().issuedate())
 {
 }
 
@@ -58,10 +57,8 @@ SecurityContract::SecurityContract(
     const std::string& shortname,
     const std::string& name,
     const std::string& symbol,
-    const std::string& terms,
-    const std::string& date)
+    const std::string& terms)
         : ot_super(nym, shortname, name, symbol, terms)
-        , issue_date_(date)
 {
 }
 
@@ -74,7 +71,6 @@ proto::UnitDefinition SecurityContract::IDVersion() const
     auto security = contract.mutable_security();
     security->set_version(1);
     security->set_type(proto::EQUITYTYPE_SHARES);
-    security->set_issuedate(issue_date_);
 
     return contract;
 }

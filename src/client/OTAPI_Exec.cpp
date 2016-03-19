@@ -1222,8 +1222,7 @@ std::string OTAPI_Exec::CreateSecurityContract(
     const std::string& shortname,
     const std::string& terms,
     const std::string& name,
-    const std::string& symbol,
-    const std::string& date) const
+    const std::string& symbol) const
 {
     std::string output = "";
 
@@ -1255,8 +1254,7 @@ std::string OTAPI_Exec::CreateSecurityContract(
         shortname,
         name,
         symbol,
-        terms,
-        date);
+        terms);
 
     if (pContract) {
         output = String(pContract->ID()).Get();
