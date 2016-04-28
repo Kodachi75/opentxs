@@ -196,6 +196,7 @@ message(STATUS "C++ link flags:  ${CMAKE_CXX_LINK_FLAGS}")
 execute_process(COMMAND git "submodule" "update" "--init" "--recursive" WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
 
+add_definitions(-DPROTOBUF_INLINE_NOT_IN_HEADERS=0)
 find_library(OPENTXS_PROTO NAMES opentxs-proto)
 find_library(OPENTXS_VERIFY NAMES opentxs-verify)
 

@@ -1,8 +1,10 @@
-option optimize_for = LITE_RUNTIME;
-import "Generics.proto";
-import "Bitcoin.proto";
+syntax = "proto2";
 
 package opentxs.OTDB;
+option optimize_for = LITE_RUNTIME;
+
+import "Generics.proto";
+import "Bitcoin.proto";
 
 message ServerInfo_InternalPB {
   optional string server_type = 1;

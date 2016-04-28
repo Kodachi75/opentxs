@@ -1,5 +1,7 @@
-option optimize_for = LITE_RUNTIME;
+syntax = "proto2";
+
 package opentxs.OTDB;
+option optimize_for = LITE_RUNTIME;
 
 message String_InternalPB {
   optional string value = 1;
