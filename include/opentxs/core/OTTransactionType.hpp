@@ -534,17 +534,14 @@ protected:
     //
     //
     // So therefore I just need to add the Notary ID, and I have both.
-    // Then all child classes should ALSO implement their own copy of both, and
-    // compare the
-    // two whenever loading something, so that we know we're safe, as well as
-    // comparing
-    // signatures.
+    // Then all child classes should ALSO implement their own copy of both,
+    // and compare the two whenever loading something, so that we know we're
+    // safe, as well as comparing signatures.
     //
     // That's really the whole point of this software -- comparing IDs and
-    // verifying
-    // signatures.
+    // verifying signatures.
 
-    //    OTIdentifier    m_ID;            // Account ID. This is in Contract
+//  OTIdentifier    m_ID;            // Account ID. This is in Contract
     // (parent class). Here we use it for the REAL ACCOUNT ID (set before
     // loading.)
     Identifier m_AcctID; // Compare m_AcctID to m_ID after loading it from

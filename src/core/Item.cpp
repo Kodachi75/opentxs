@@ -54,33 +54,26 @@
 
 // Server-side.
 //
-// By the time this is called, I know that the item, AND this balance item
-// (this)
+// By the time this is called, I know that the item, AND this balance item (this)
 // both have the correct user id, server id, account id, and transaction id, and
 // they have been signed properly by the owner.
 //
 // So what do I need to verify in this function?
 //
 // -- That the transactions on THE_NYM (server-side), minus the current
-// transaction number being processed,
-//    are all still there.
+// transaction number being processed, are all still there.
 // -- If theMessageNym is missing certain numbers that I expected to find on
-// him, that means he is trying to
-//    trick the server into signing a new agreement where he is no longer
-// responsible for those numbers. They must
-//    all be there.
+// him, that means he is trying to trick the server into signing a new agreement
+// where he is no longer responsible for those numbers. They must all be there.
 // -- If theMessageNym has ADDED certain numbers that I DIDN'T expect to find on
-// him, then he's trying to trick
-//    me into allowing him to add those numbers to his receipt -- OR it could
-// mean that certain numbers were already
-//    removed on my side (such as the opening # for a cron item like a market
-// offer that has already been closed),
-//    but the client-side isn't aware of this yet, and so he is trying to sign
-// off on formerly-good numbers that
-//    have since expired.  This shouldn't happen IF the client has been properly
-// notified about these numbers before
-//    sending his request.  Such notifications are dropped into the Nymbox AND
-// related asset account inboxes.
+// him, then he's trying to trick me into allowing him to add those numbers to his
+// receipt -- OR it could mean that certain numbers were already removed on my side
+// (such as the opening # for a cron item like a market  offer that has already
+// been closed), but the client-side isn't aware of this yet, and so he is trying
+// to sign off on formerly-good numbers that have since expired.  This shouldn't
+// happen IF the client has been properly notified about these numbers before
+// sending his request.  Such notifications are dropped into the Nymbox AND related
+// asset account inboxes.
 //
 
 namespace opentxs
@@ -88,10 +81,8 @@ namespace opentxs
 
 bool Item::VerifyTransactionStatement(Nym& THE_NYM,
                                       OTTransaction& TARGET_TRANSACTION,
-                                      bool bIsRealTransaction) // Sometimes
-                                                               // the trans#
-                                                               // is 0 (like
-// when processing Nymbox)
+                                      bool bIsRealTransaction) // Sometimes the trans#
+                                                               // is 0 (like when processing Nymbox)
 {
     if (GetType() != Item::transactionStatement) {
         otOut << __FUNCTION__

@@ -631,7 +631,7 @@ void OTTrade::onRemovalFromCron()
     int64_t scale = 1; // todo stop hardcoding.
     int64_t transactionNum = 0;
 
-    if (offer_ != nullptr) {
+    if (offer_ == nullptr) {
         if (!marketOffer_.Exists()) {
             otErr
                 << "OTTrade::onRemovalFromCron called with nullptr offer_ and "
