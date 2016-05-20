@@ -198,7 +198,192 @@ OTServer::~OTServer()
     }
 }
 
-void OTServer::Init(bool readOnly)
+void OTServer::CreateMainFile(
+    bool& mainFileExists,
+    std::map<std::string, std::string>& args)
+{
+    NymParameters nymParameters(
+        NymParameters::SECP256K1,
+        proto::CREDTYPE_HD);
+    std::unique_ptr<Nym> newNym(new Nym(nymParameters));
+
+    if (!newNym) {
+        Log::vError("Error: Failed to create server nym\n");
+        OT_FAIL;
+    }
+    String serverNymID;
+    newNym->GetIdentifier(serverNymID);
+    newNym.reset();
+    const std::string strNymID(serverNymID.Get(), serverNymID.GetLength());
+
+    const std::string defaultTerms = "This is an example server contract.";
+    const std::string& userTerms = args["terms"];
+    std::string terms = userTerms;
+
+    if (1 > userTerms.size()) {
+        terms = defaultTerms;
+    }
+
+    const std::string defaultExternalIP = DEFAULT_EXTERNAL_IP;
+    const std::string& userExternalIP = args["externalip"];
+    std::string hostname = userExternalIP;
+
+    if (5 > hostname.size()) {
+        hostname = defaultExternalIP;
+    }
+
+    const std::string defaultBindIP = DEFAULT_BIND_IP;
+    const std::string& userBindIP = args["bindip"];
+    std::string bindIP = userBindIP;
+
+    if (5 > bindIP.size()) {
+        bindIP = defaultBindIP;
+    }
+
+    bool notUsed = false;
+    App::Me().Config().Set_str("Listen", "bindip", bindIP, notUsed);
+
+    const uint32_t defaultCommandPort = DEFAULT_COMMAND_PORT;
+    const std::string& userCommandPort = args["commandport"];
+    uint32_t commandPort = 0;
+    bool needPort = true;
+
+    while (needPort) {
+        try {
+            commandPort = std::stoi(userCommandPort.c_str());
+        }
+        catch (std::invalid_argument) {
+            commandPort = defaultCommandPort;
+            needPort = false;
+        }
+        catch (std::out_of_range) {
+            commandPort = defaultCommandPort;
+            needPort = false;
+        }
+        commandPort = (MAX_TCP_PORT < commandPort) ? defaultCommandPort : commandPort;
+        commandPort = (MIN_TCP_PORT > commandPort) ? defaultCommandPort : commandPort;
+        needPort = false;
+    }
+
+    const std::string& userListenCommand = args["listencommand"];
+    uint32_t listenCommand = 0;
+    bool needListenCommand = true;
+
+    while (needListenCommand) {
+        try {
+            listenCommand = std::stoi(userListenCommand.c_str());
+        }
+        catch (std::invalid_argument) {
+            listenCommand = defaultCommandPort;
+            needListenCommand = false;
+        }
+        catch (std::out_of_range) {
+            listenCommand = defaultCommandPort;
+            needListenCommand = false;
+        }
+        listenCommand = (MAX_TCP_PORT < listenCommand) ? defaultCommandPort : listenCommand;
+        listenCommand = (MIN_TCP_PORT > listenCommand) ? defaultCommandPort : listenCommand;
+        needListenCommand = false;
+    }
+
+    App::Me().Config().Set_str(
+        "Listen",
+        "command",
+        std::to_string(listenCommand),
+        notUsed);
+
+    const uint32_t defaultNotificationPort = DEFAULT_NOTIFY_PORT;
+
+    const std::string& userListenNotification = args["listencommand"];
+    uint32_t listenNotification = 0;
+    bool needListenNotification = true;
+
+    while (needListenNotification) {
+        try {
+            listenNotification = std::stoi(userListenNotification.c_str());
+        }
+        catch (std::invalid_argument) {
+            listenNotification = defaultNotificationPort;
+            needListenNotification = false;
+        }
+        catch (std::out_of_range) {
+            listenNotification = defaultNotificationPort;
+            needListenNotification = false;
+        }
+        listenNotification = (MAX_TCP_PORT < listenNotification) ? defaultNotificationPort : listenNotification;
+        listenNotification = (MIN_TCP_PORT > listenNotification) ? defaultNotificationPort : listenNotification;
+        needListenNotification = false;
+    }
+
+    App::Me().Config().Set_str(
+        "Listen",
+        "notification",
+        std::to_string(listenNotification),
+        notUsed);
+
+    const std::string defaultName = DEFAULT_NAME;
+    const std::string& userName = args["name"];
+    std::string name = userName;
+
+    if (1 > name.size()) {
+        name = defaultName;
+    }
+    auto pContract = App::Me().Contract().Server(
+        strNymID,
+        name,
+        terms,
+        hostname,
+        commandPort);
+
+    std::string strNotaryID;
+    if (pContract) {
+        std::string strHostname;
+        uint32_t nPort = 0;
+
+        if (!pContract->ConnectInfo(strHostname, nPort)) {
+            otOut << __FUNCTION__ << ": Unable to retrieve connection info from "
+            "this contract. Please fix that first; see "
+            "the sample data. (Failure.)\n";
+            OT_FAIL;
+        }
+        strNotaryID = String(pContract->ID()).Get();
+    } else {
+        OT_FAIL;
+    }
+
+    std::string strCachedKey;
+    if (OTCachedKey::It()->IsGenerated()) {
+        OTASCIIArmor ascMasterContents;
+
+        if (OTCachedKey::It()->SerializeTo(ascMasterContents)) {
+            strCachedKey.assign(ascMasterContents.Get(), ascMasterContents.GetLength());
+        }
+        else
+            OT_FAIL;
+    } else {
+        OT_FAIL;
+    }
+
+    const OTData signedContract =
+        proto::ProtoAsData<proto::ServerContract>(pContract->PublicContract());
+    OTASCIIArmor ascContract(signedContract);
+    opentxs::String strBookended;
+    ascContract.WriteArmoredString(
+        strBookended,
+        "SERVER CONTRACT");
+    OTDB::StorePlainString(strBookended.Get(), "NEW_SERVER_CONTRACT.txt");
+
+    otOut << "Your server contract has been saved as " << std::endl
+    << " NEW_SERVER_CONTRACT.txt in the server data directory."
+    << std::endl;
+
+    mainFileExists = mainFile_.CreateMainFile(
+        strBookended.Get(), strNotaryID, "", strNymID, strCachedKey);
+}
+
+void OTServer::Init(
+    std::map<std::string, std::string>& args,
+    bool readOnly)
 {
     m_bReadOnly = readOnly;
 
@@ -301,145 +486,8 @@ void OTServer::Init(bool readOnly)
                 "Plus, unable to create, since read-only flag is set.\n",
                 m_strWalletFilename.Get());
             OT_FAIL;
-        }
-        else {
-            NymParameters nymParameters(
-                NymParameters::SECP256K1,
-                proto::CREDTYPE_HD);
-            std::unique_ptr<Nym> newNym(new Nym(nymParameters));
-
-            if (!newNym) {
-                Log::vError("Error: Failed to create server nym\n");
-                OT_FAIL;
-            }
-            String serverNymID;
-            newNym->GetIdentifier(serverNymID);
-            newNym.reset();
-            std::string strNymID(serverNymID.Get(), serverNymID.GetLength());
-
-            std::string defaultContract =
-            "<notaryProviderContract version=\"2.0\">\n\n";
-            defaultContract += "<entity shortname=\"localhost\"\n";
-            defaultContract += " longname=\"Localhost Test Contract\"\n";
-            defaultContract += " email=\"serverfarm@blahcloudcomputing.com\"\n";
-            defaultContract += " serverURL=\"https://blahtransactions.com/vers/1/\"/>\n\n";
-             defaultContract += "</notaryProviderContract>\n";
-
-            otOut << "Default server contract. Modify this as needed "
-                  << "and paste below: (empty line will use default)"
-                  << std::endl << std::endl;
-            otOut << defaultContract << std::endl << std::endl;
-            otOut << "Paste your contract, or a blank line here, " << std::endl
-                  << "and terminate with a ~ (tilde character) on a new line: "
-                  << std::endl;
-            std::string untrimmed = OT_CLI_ReadUntilEOF();
-
-            if (10 > untrimmed.size()) {
-                untrimmed = defaultContract;
-            }
-
-            std::string str_Trim = String::trim(untrimmed);
-            String strContract(str_Trim.c_str(), str_Trim.size());
-
-            if (strContract.GetLength() < 2) {
-                otOut << __FUNCTION__ << ": Empty server contract (Failure.)\n";
-                OT_FAIL;
-            } else {
-                otOut << "Terms accepted. " << std::endl;
-            }
-
-            const std::string defaultHostname = "127.0.0.1";
-            otOut << "Enter your new server's hostname or IP address ["
-            << defaultHostname << "]: " << std::endl;
-            std::string hostname = OT_CLI_ReadLine();
-            if (5 > hostname.size())
-                hostname = defaultHostname;
-            otOut << "Using hostname or IP address: " << hostname << std::endl;
-
-            bool needPort = true;
-            uint32_t portNum = 0;
-            uint32_t defaultPortNum = 7085;
-            while (needPort) {
-                otOut << "Enter the port number for the server to listen on [" << defaultPortNum << "]: "  << std::endl;
-
-                const std::string port = OT_CLI_ReadLine();
-
-                try {
-                    portNum = std::stoi(port.c_str());
-                }
-                catch (std::invalid_argument) {
-                    portNum = defaultPortNum;
-                    needPort = false;
-                }
-                catch (std::out_of_range) {
-                    portNum = defaultPortNum;
-                    needPort = false;
-                }
-                portNum = (65536 <= portNum) ? defaultPortNum : portNum;
-                needPort = false;
-            }
-            otOut << "Using port: " << portNum << std::endl;
-
-            const std::string defaultName = "localhost";
-            otOut << "Finally, enter a name for this server to help users "
-                  << "recognize it [" << defaultName << "]: " << std::endl;
-            std::string name = OT_CLI_ReadLine();
-            if (1 > name.size())
-                name = defaultName;
-            otOut << "Using server name: " << name << "\n";
-
-            auto pContract = App::Me().Contract().Server(
-                strNymID,
-                name,
-                strContract.Get(),
-                hostname,
-                portNum);
-
-            std::string strNotaryID;
-            if (pContract)
-            {
-                std::string strHostname;
-                uint32_t nPort = 0;
-
-                if (!pContract->ConnectInfo(strHostname, nPort)) {
-                    otOut << __FUNCTION__ << ": Unable to retrieve connection info from "
-                    "this contract. Please fix that first; see "
-                    "the sample data. (Failure.)\n";
-                    OT_FAIL;
-                }
-                strNotaryID = String(pContract->ID()).Get();
-            } else {
-                OT_FAIL;
-            }
-
-            std::string strCachedKey;
-            if (OTCachedKey::It()->IsGenerated()) {
-                OTASCIIArmor ascMasterContents;
-
-                if (OTCachedKey::It()->SerializeTo(ascMasterContents)) {
-                    strCachedKey.assign(ascMasterContents.Get(), ascMasterContents.GetLength());
-                }
-                else
-                    OT_FAIL;
-            } else {
-                OT_FAIL;
-            }
-
-            const OTData signedContract =
-                proto::ProtoAsData<proto::ServerContract>(pContract->PublicContract());
-            OTASCIIArmor ascContract(signedContract);
-            opentxs::String strBookended;
-            ascContract.WriteArmoredString(
-                strBookended,
-                "SERVER CONTRACT");
-            OTDB::StorePlainString(strBookended.Get(), "NEW_SERVER_CONTRACT.txt");
-
-            otOut << "Your server contract has been saved as " << std::endl
-            << " NEW_SERVER_CONTRACT.txt in the server data directory."
-            << std::endl;
-
-            mainFileExists = mainFile_.CreateMainFile(
-                strBookended.Get(), strNotaryID, "", strNymID, strCachedKey);
+        } else {
+            CreateMainFile(mainFileExists, args);
         }
     }
 
@@ -781,11 +829,29 @@ bool OTServer::DropMessageToNymbox(const Identifier& NOTARY_ID,
 
 bool OTServer::GetConnectInfo(std::string& strHostname, uint32_t& nPort) const
 {
-    auto contract = App::Me().Contract().Server(m_strNotaryID);
+    bool notUsed = false;
+    int64_t port = 0;
 
-    if (!contract) { return false; }
+    const bool haveIP = App::Me().Config().CheckSet_str(
+        "Listen",
+        "bindip",
+        DEFAULT_BIND_IP,
+        strHostname,
+        notUsed);
 
-    return contract->ConnectInfo(strHostname, nPort);
+    const bool havePort = App::Me().Config().CheckSet_long(
+        "Listen",
+        "command",
+        DEFAULT_COMMAND_PORT,
+        port,
+        notUsed);
+
+    port = (MAX_TCP_PORT < port) ? DEFAULT_COMMAND_PORT : port;
+    port = (MIN_TCP_PORT > port) ? DEFAULT_COMMAND_PORT : port;
+
+    nPort = port;
+
+    return (haveIP && havePort);
 }
 
 zcert_t* OTServer::GetTransportKey() const

@@ -39,7 +39,9 @@
 #ifndef OPENTXS_SERVER_SERVERLOADER_HPP
 #define OPENTXS_SERVER_SERVERLOADER_HPP
 
+#include <map>
 #include <vector>
+#include <string>
 
 #include "OTServer.hpp"
 #include <opentxs/core/app/App.hpp>
@@ -57,7 +59,7 @@ namespace opentxs
 class ServerLoader
 {
 public:
-    ServerLoader()
+    ServerLoader(std::map<std::string, std::string>& args)
         : server_(nullptr)
     {
 // This is optional! (I, of course, am using it in this test app...)
@@ -104,7 +106,7 @@ public:
         // key he can use to talk to it.
         //
         // Keys, etc are loaded here. Assumes main path is set!
-        server_->Init();
+        server_->Init(args);
 
         // A heartbeat for recurring transactions, such as markets, payment
         // plans, and smart contracts.

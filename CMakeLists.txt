@@ -50,6 +50,7 @@ option(KEYRING_IOS         "Build with iOS Keyring" OFF)
 option(KEYRING_GNOME       "Build with Gnome Keyring" OFF)
 option(KEYRING_KWALLET     "Build with KWallet Keyring" OFF)
 option(KEYRING_FLATFILE    "Build with Flatfile Keyring" OFF)
+option(NO_PASSWORD         "Use default password for all prompts" OFF)
 
 option(OT_DHT    "Enable OpenDHT support" OFF)
 
@@ -109,6 +110,7 @@ message(STATUS "Keyring iOS:            ${KEYRING_IOS}")
 message(STATUS "Keyring Gnome:          ${KEYRING_GNOME}")
 message(STATUS "Keyring KWallet:        ${KEYRING_KWALLET}")
 message(STATUS "Keyring flatfile:       ${KEYRING_FLATFILE}")
+message(STATUS "No password:            ${NO_PASSWORD}")
 
 message(STATUS "Network plugins------------------------------")
 message(STATUS "DHT:                    ${OT_DHT}")
@@ -414,6 +416,10 @@ endif()
 
 if(KEYRING_FLATFILE)
   add_definitions(-DOT_KEYRING_FLATFILE)
+endif()
+
+if(NO_PASSWORD)
+  add_definitions(-DOT_NO_PASSWORD)
 endif()
 
 if(WIN32)

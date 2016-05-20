@@ -518,7 +518,7 @@ std::shared_ptr<OTCachedKey> OTCachedKey::CreateMasterPassword(
     return std::shared_ptr<OTCachedKey>();
 }
 
-    
+
 // GetMasterPassword USES the User Passphrase to decrypt the cached key
 // and return a decrypted plaintext of that cached symmetric key.
 // Whereas ChangeUserPassphrase CHANGES the User Passphrase that's used
@@ -533,10 +533,10 @@ bool OTCachedKey::ChangeUserPassphrase()
     }
     // --------------------------------------------------------------------
     const String strReason1("Enter old wallet master passphrase");
-    
+
     // Returns a text OTPassword, or nullptr.
     std::shared_ptr<OTPassword> pOldUserPassphrase(OTSymmetricKey::GetPassphraseFromUser(&strReason1)); //bool bAskTwice = false
-    
+
     if (!pOldUserPassphrase)
     {
         otErr << __FUNCTION__ << ": Error: Failed while trying to get old passphrase from user.\n";
@@ -544,10 +544,10 @@ bool OTCachedKey::ChangeUserPassphrase()
     }
     // --------------------------------------------------------------------
     const String strReason2("Create new wallet master passphrase");
-    
+
     // Returns a text OTPassword, or nullptr.
     std::shared_ptr<OTPassword> pNewUserPassphrase(OTSymmetricKey::GetPassphraseFromUser(&strReason2, true)); //bool bAskTwice = false by default.
-    
+
     if (!pNewUserPassphrase)
     {
         otErr << __FUNCTION__ << ": Error: Failed while trying to get new passphrase from user.\n";
@@ -561,9 +561,9 @@ bool OTCachedKey::ChangeUserPassphrase()
     if (nullptr != m_pMasterPassword)
     {
         OTPassword* pPassword = m_pMasterPassword;
-        
+
         m_pMasterPassword = nullptr;
-        
+
         delete pPassword;
         pPassword = nullptr;
     }
@@ -573,7 +573,7 @@ bool OTCachedKey::ChangeUserPassphrase()
     const std::string str_display;
     const Identifier  idCachedKey(*m_pSymmetricKey); // Symmetric Key ID of the Master key.
     const String      strCachedKeyHash(idCachedKey); // Same thing, in string form.
-    
+
     const bool bDeletedSecret =
         IsUsingSystemKeyring() && OTKeyring::DeleteSecret(
                             strCachedKeyHash, // HASH OF ENCRYPTED MASTER KEY
@@ -593,9 +593,11 @@ bool OTCachedKey::ChangeUserPassphrase()
 // The password callback uses this to get the password for any individual Nym.
 // This will also generate the master password, if one does not already exist.
 //
-bool OTCachedKey::GetMasterPassword(std::shared_ptr<OTCachedKey>& mySharedPtr,
-                                    OTPassword& theOutput,
-                                    const char* szDisplay, bool bVerifyTwice)
+bool OTCachedKey::GetMasterPassword(
+    std::shared_ptr<OTCachedKey>& mySharedPtr,
+    OTPassword& theOutput,
+    const char* szDisplay,
+    __attribute__((unused)) bool bVerifyTwice)
 {
     std::lock_guard<std::mutex> lock(m_Mutex);
 
@@ -857,14 +859,14 @@ bool OTCachedKey::GetMasterPassword(std::shared_ptr<OTCachedKey>& mySharedPtr,
 
         if (!bGenerated) // This Symmetric Key hasn't been generated before....
         {
-
+#ifndef OT_NO_PASSWORD
             if (!OTAsymmetricKey::GetPasswordCallback()(
                     nullptr, 0, bVerifyTwice ? 1 : 0,
                     static_cast<void*>(&thePWData))) {
                 otErr << __FUNCTION__ << ": Failed to get password from user!";
                 return false;
             }
-
+#endif // OT_NO_PASSWORD
             // If the length of the user supplied password is less than 4
             // characters int64_t, we are going to use the default password!
             bool bUsingDefaultPassword = false;
