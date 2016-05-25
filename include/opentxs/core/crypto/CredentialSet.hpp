@@ -253,12 +253,12 @@ public:
     EXPORT ~CredentialSet();
     EXPORT bool WriteCredentials() const;
 
-    bool GetContactData(std::shared_ptr<proto::ContactData>& contactData) const;
+    bool GetContactData(std::unique_ptr<proto::ContactData>& contactData) const;
     void RevokeContactCredentials(std::list<std::string>& contactCredentialIDs);
     bool AddContactCredential(const proto::ContactData& contactData);
 
     bool GetVerificationSet(
-        std::shared_ptr<proto::VerificationSet>& verificationSet) const;
+        std::unique_ptr<proto::VerificationSet>& verificationSet) const;
     void RevokeVerificationCredentials(
         std::list<std::string>& verificationCredentialIDs);
     bool AddVerificationCredential(

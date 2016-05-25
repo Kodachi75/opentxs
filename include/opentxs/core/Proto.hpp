@@ -39,7 +39,10 @@
 #ifndef OPENTXS_CORE_PROTO_HPP
 #define OPENTXS_CORE_PROTO_HPP
 
-#include <opentxs/core/Proto.hpp>
+#include <opentxs-proto/verify/VerifyContacts.hpp>
+#include <opentxs-proto/verify/VerifyContracts.hpp>
+#include <opentxs-proto/verify/VerifyCredentials.hpp>
+#include <opentxs-proto/verify/VerifyStorage.hpp>
 
 #include "OTData.hpp"
 #include "crypto/OTASCIIArmor.hpp"

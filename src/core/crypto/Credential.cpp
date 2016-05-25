@@ -568,7 +568,7 @@ bool Credential::AddMasterSignature()
 
 // Override this method for credentials capable of returning contact data.
 bool Credential::GetContactData(
-    std::shared_ptr<proto::ContactData>& contactData) const
+    std::unique_ptr<proto::ContactData>& contactData) const
 {
     OT_ASSERT_MSG(false, "This method was called on the wrong credential.\n");
 
@@ -577,7 +577,7 @@ bool Credential::GetContactData(
 
 // Override this method for credentials capable of returning verification sets.
 bool Credential::GetVerificationSet(
-    std::shared_ptr<proto::VerificationSet>& verificationSet) const
+    std::unique_ptr<proto::VerificationSet>& verificationSet) const
 {
     OT_ASSERT_MSG(false, "This method was called on the wrong credential.\n");
 

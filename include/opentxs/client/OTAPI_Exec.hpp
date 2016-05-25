@@ -39,6 +39,7 @@
 #ifndef OPENTXS_CLIENT_OTAPI_EXEC_HPP
 #define OPENTXS_CLIENT_OTAPI_EXEC_HPP
 
+#include "opentxs/core/Types.hpp"
 #include "opentxs/client/OpenTransactions.hpp"
 #include "opentxs/core/util/Common.hpp"
 
@@ -466,14 +467,11 @@ public:
 
     /**   Obtain the set of contact data associated with the target nym
      *    \param[in]  nymID the indentifier of the target nym
-     *    \return ASCII-armored serialized ContactData protobuf
+     *    \return std::string containing serialized ContactData protobuf
+     *    \note This function returns binary data, not text
      */
     EXPORT std::string GetContactData(const std::string& nymID) const;
-    /**   Obtain the set of contact data associated with the target nym
-     *    \param[in]  nymID the indentifier of the target nym
-     *    \return std::set of claim tuples
-     */
-    EXPORT OT_API::ClaimSet GetClaims(const std::string& nymID) const;
+
     /**   Replace the target nym's contact data with a new set
      *    \param[in]  nymID the indentifier of the target nym
      *    \param[in]  data ASCII-armored serialized ContactData protobuf
@@ -483,24 +481,35 @@ public:
      */
     EXPORT bool SetContactData(const std::string& nymID,
                                const std::string& data) const;
+
     /**   Add a single claim to the target nym's contact credential
      *    \param[in]  nymID the indentifier of the target nym
-     *    \param[in]  claim claim tuple
+     *    \param[in]  section section containing the claim
+     *    \param[in]  claim serialized ContactItem protobuf
      *    \return true for success, false for error
      */
-    EXPORT bool SetClaim(const std::string& nymID, Claim& claim) const;
+    EXPORT bool SetClaim(
+        const std::string& nymID,
+        const std::uint32_t& section,
+        const std::string& claim) const;
+
     /**   Remove a single claim from the target nym's contact credential
      *    \param[in]  nymID the indentifier of the target nym
      *    \param[in]  claimID the indentifier of the target claim
      *    \return true for success, false for error
      */
-    EXPORT bool DeleteClaim(const std::string& nymID, std::string& claimID) const;
+    EXPORT bool DeleteClaim(
+        const std::string& nymID,
+        const std::string& claimID) const;
+
     /**  Obtain the set of claim verifications associated with the target nym
-     *   \param[in]  nymID the indentifier of the target nym
-     *   \return std::tuple of internal and external verifications sets
+     *    \param[in]  nymID the indentifier of the target nym
+     *    \return std::string containing serialized VerificationSet protobuf
+     *    \note This function returns binary data, not text
      */
-    EXPORT OT_API::VerificationSet GetVerificationSet(
+    EXPORT std::string GetVerificationSet(
         const std::string& nymID) const;
+
     /**   Add a single verification to the target nym's verification credential
      *    \param[out] changed set to true if the verification is added
      *    \param[in]  onNym the indentifier of the target nym
@@ -509,15 +518,74 @@ public:
      *    \param[in]  polarity type of verification: positive, neutral, negative
      *    \param[in]  start beginning of the validation interval. defaults to 0
      *    \param[in]  end end of the validation interval. defaults to 0
+     *    \return std::string containing serialized VerificationSet protobuf
+     *    \note This function returns binary data, not text
      */
-    EXPORT OT_API::VerificationSet SetVerification(
+    EXPORT std::string SetVerification(
         bool& changed,
         const std::string& onNym,
         const std::string& claimantNymID,
         const std::string& claimID,
-        const OT_API::ClaimPolarity polarity,
-        const int64_t start = 0,
-        const int64_t end = 0) const;
+        const ClaimPolarity polarity,
+        const std::int64_t start = 0,
+        const std::int64_t end = 0) const;
+
+    /**  Translate an claim attribute enum value to human-readable text
+     *    \param[in]  type claim attribute enum value
+     *    \param[in]  lang two letter code for the language to use for the
+     *                     translation
+     *    \return translated attribute name
+     */
+    EXPORT std::string ContactAttributeName(
+        const proto::ContactItemAttribute type,
+        std::string lang = "en");
+
+    /**  Get a list of allowed section types for contact data protobufs of the
+     *   specified version
+     *    \param[in]  version version of the contact data protobuf to query
+     *    \return list of allowed section types
+     */
+    EXPORT std::set<proto::ContactSectionName> ContactSectionList(
+        const std::uint32_t version = 1);
+
+    /**  Translate a claim section name enum value to human-readable text
+     *    \param[in]  section claim section name enum value
+     *    \param[in]  lang two letter code for the language to use for the
+     *                     translation
+     *    \return translated claim section
+     */
+    EXPORT std::string ContactSectionName(
+        const proto::ContactSectionName section,
+        std::string lang = "en");
+
+    /**  Get a list of allowed claim types for sections of the specified version
+     *    \param[in]  section section name
+     *    \param[in]  version version of the specified section name
+     *    \return list of allowed claim types
+     */
+    EXPORT std::set<proto::ContactItemType> ContactSectionTypeList(
+        const proto::ContactSectionName section,
+        const std::uint32_t version = 1);
+
+    /**  Translate a claim type enum value to human-readable text
+     *    \param[in]  section claim type enum value
+     *    \param[in]  lang two letter code for the language to use for the
+     *                     translation
+     *    \return translated claim type
+     */
+    EXPORT std::string ContactTypeName(
+        const proto::ContactItemType type,
+        std::string lang = "en");
+
+    /**  Find the relationship type which acts as the inverse of the given value
+     *    \param[in]  relationship claim type enum value for the relationship to
+     *                             be reversed
+     *    \return claim type enum value for the reciprocal relationship, or
+     *            proto::CITEMTYPE_ERROR
+     */
+    EXPORT proto::ContactItemType ReciprocalRelationship(
+        const proto::ContactItemType relationship);
+
     /** Creates a contract based on the contents passed in,
     // then sets the contract key based on the NymID,
     // and signs it with that Nym.

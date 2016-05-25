@@ -39,11 +39,11 @@
 #ifndef OPENTXS_CLIENT_OPENTRANSACTIONS_HPP
 #define OPENTXS_CLIENT_OPENTRANSACTIONS_HPP
 
-#include <opentxs/core/util/Common.hpp>
-#include <opentxs/core/Nym.hpp>
-#include <opentxs/core/String.hpp>
+#include "opentxs/core/String.hpp"
+#include "opentxs/core/Types.hpp"
 #include "opentxs/core/app/Wallet.hpp"
-#include <opentxs/core/crypto/NymParameters.hpp>
+#include "opentxs/core/crypto/NymParameters.hpp"
+#include "opentxs/core/util/Common.hpp"
 
 #include <memory>
 #include <set>
@@ -65,6 +65,7 @@ class OTEnvelope;
 class Ledger;
 class Message;
 class NumList;
+class Nym;
 class OTNym_or_SymmetricKey;
 class OTPassword;
 class OTPasswordData;
@@ -88,25 +89,6 @@ private:
 public:
     EXPORT static bool InitOTApp();
     EXPORT static bool CleanupOTApp();
-
-    typedef std::set<Claim> ClaimSet;
-
-    // verification identifier, claim identifier, polarity, start time,
-    // end time, signature, retracted
-    typedef std::tuple<std::string, std::string, bool, int64_t, int64_t, std::string, bool> Verification;
-    // nymID, verifications
-    typedef std::map<std::string, std::set<Verification>> VerificationMap;
-    // internal verifications, external verifications, repudiated IDs
-    typedef std::tuple<
-        VerificationMap,
-        VerificationMap,
-        std::set<std::string>> VerificationSet;
-
-    enum class ClaimPolarity : uint8_t {
-        NEUTRAL  = 0,
-        POSITIVE = 1,
-        NEGATIVE = 2
-    };
 
 private:
     class Pid;
@@ -212,39 +194,9 @@ public:
         bool bChecking = false,
         const char* szFuncName = nullptr,
         const OTPasswordData* pPWData = nullptr) const;
-    EXPORT std::shared_ptr<proto::ContactData> GetContactData(
-        const Nym& fromNym) const;
-    EXPORT ClaimSet GetClaims(const Nym& fromNym) const;
-    EXPORT bool SetContactData(Nym& onNym,
-                               const proto::ContactData&) const;
-    EXPORT bool SetClaim(Nym& onNym, Claim& claim) const;
-    EXPORT bool DeleteClaim(Nym& onNym, std::string& claimID) const;
-    EXPORT std::set<uint32_t> GetContactSections(const uint32_t version = 1);
-    EXPORT std::set<uint32_t> GetContactSectionTypes(
-        const uint32_t section,
-        const uint32_t version = 1);
-    EXPORT std::string GetContactSectionName(
-        const uint32_t section,
-        std::string lang = "en");
-    EXPORT std::string GetContactTypeName(
-        const uint32_t type,
-        std::string lang = "en");
-    EXPORT std::string GetContactAttributeName(
-        const uint32_t type,
-        std::string lang = "en");
-    EXPORT uint32_t GetReciprocalRelationship(const uint32_t relationship);
+
     EXPORT static std::string NymIDFromPaymentCode(
         const std::string& paymentCode);
-    EXPORT VerificationSet GetVerificationSet(const Nym& fromNym) const;
-    EXPORT VerificationSet SetVerification(
-        Nym& onNym,
-        bool& changed,
-        const std::string& claimantNymID,
-        const std::string& claimID,
-        const ClaimPolarity polarity,
-        const int64_t start = 0,
-        const int64_t end = 0,
-        const OTPasswordData* pPWData = nullptr) const;
     EXPORT Account* GetOrLoadAccount(const Nym& theNym,
                                      const Identifier& ACCT_ID,
                                      const Identifier& NOTARY_ID,

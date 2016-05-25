@@ -52,6 +52,7 @@
 #include <opentxs/core/NymIDSource.hpp>
 #include "crypto/OTASCIIArmor.hpp"
 #include "Identifier.hpp"
+#include "Types.hpp"
 
 namespace opentxs
 {
@@ -80,9 +81,6 @@ typedef std::map<std::string, CredentialSet*> mapOfCredentialSets;
 typedef std::list<OTAsymmetricKey*> listOfAsymmetricKeys;
 typedef proto::CredentialIndex serializedCredentialIndex;
 typedef bool CredentialIndexModeFlag;
-
-// claim identifier, section, type, value, start time, end time, attributes
-typedef std::tuple<std::string, uint32_t, uint32_t, std::string, int64_t, int64_t, std::set<uint32_t>> Claim;
 
 class Nym
 {
@@ -846,10 +844,10 @@ public:
     EXPORT void DisplayStatistics(String& strOutput);
 
     EXPORT bool WriteCredentials() const;
-    std::shared_ptr<proto::ContactData> ContactData() const;
+    std::unique_ptr<proto::ContactData> ContactData() const;
     bool SetContactData(const proto::ContactData& data);
 
-    std::shared_ptr<proto::VerificationSet> VerificationSet() const;
+    std::unique_ptr<proto::VerificationSet> VerificationSet() const;
     bool SetVerificationSet(const proto::VerificationSet& data);
 
     bool Sign(

@@ -36,48 +36,39 @@
  *
  ************************************************************/
 
-#ifndef OPENTXS_CORE_CRYPTO_VERIFICATIONCREDENTIAL_HPP
-#define OPENTXS_CORE_CRYPTO_VERIFICATIONCREDENTIAL_HPP
+#ifndef OPENTXS_CORE_TYPES
+#define OPENTXS_CORE_TYPES
 
-#include "Credential.hpp"
-#include <opentxs/core/crypto/NymParameters.hpp>
-#include <opentxs-proto/verify/VerifyCredentials.hpp>
-
-#include <memory>
+#include <cstdint>
+#include <set>
+#include <tuple>
+#include <string>
 
 namespace opentxs
 {
+/** C++11 representation of a claim. This version is more useful than the
+ *  protobuf version, since it contains the claim ID.
+ */
+typedef std::tuple<
+    std::string,             // claim identifier
+    std::uint32_t,           // section
+    std::uint32_t,           // type
+    std::string,             // value
+    std::int64_t,            // start time
+    std::int64_t,            // end time
+    std::set<std::uint32_t>> // attributes
+        Claim;
 
-class VerificationCredential : public Credential
-{
-private:
-    typedef Credential ot_super;
-    friend class Credential;
+/** C++11 representation of all contact data associated with a nym, aggregating
+ *  each the nym's contact credentials in the event it has more than one.
+ */
+typedef std::set<Claim> ClaimSet;
 
-    std::unique_ptr<proto::VerificationSet> data_;
-
-    VerificationCredential() = delete;
-    VerificationCredential(
-        CredentialSet& parent,
-        const proto::Credential& credential);
-    VerificationCredential(
-        CredentialSet& parent,
-        const NymParameters& nymParameters);
-
-public:
-    static proto::Verification SigningForm(const proto::Verification& item);
-    static std::string VerificationID(const proto::Verification& item);
-
-    bool GetVerificationSet(
-        std::unique_ptr<proto::VerificationSet>& verificationSet) const override;
-    serializedCredential asSerialized(
-        SerializationModeFlag asPrivate,
-        SerializationSignatureFlag asSigned) const override;
-    bool VerifyInternally() const override;
-
-    virtual ~VerificationCredential() = default;
+enum class ClaimPolarity : std::uint8_t {
+    NEUTRAL  = 0,
+    POSITIVE = 1,
+    NEGATIVE = 2
 };
 
 } // namespace opentxs
-
-#endif // OPENTXS_CORE_CRYPTO_VERIFICATIONCREDENTIAL_HPP
+#endif // OPENTXS_CORE_TYPES

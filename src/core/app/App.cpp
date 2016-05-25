@@ -67,6 +67,7 @@ void App::Init()
     Init_Config();
     Init_Contracts();
     Init_Crypto();
+    Init_Identity();
     Init_Storage();
     Init_Dht();
     Init_Periodic();
@@ -87,6 +88,11 @@ void App::Init_Contracts()
 void App::Init_Crypto()
 {
     crypto_ = &CryptoEngine::It();
+}
+
+void App::Init_Identity()
+{
+    identity_.reset(new class Identity);
 }
 
 void App::Init_Storage()
@@ -321,6 +327,13 @@ Settings& App::Config()
     return *config_;
 }
 
+Wallet& App::Contract()
+{
+    OT_ASSERT(contract_manager_)
+
+    return *contract_manager_;
+}
+
 CryptoEngine& App::Crypto()
 {
     OT_ASSERT(nullptr != crypto_)
@@ -342,11 +355,11 @@ Dht& App::DHT()
     return *dht_;
 }
 
-Wallet& App::Contract()
+class Identity& App::Identity()
 {
-    OT_ASSERT(contract_manager_)
+    OT_ASSERT(identity_)
 
-    return *contract_manager_;
+    return *identity_;
 }
 
 void App::Schedule(

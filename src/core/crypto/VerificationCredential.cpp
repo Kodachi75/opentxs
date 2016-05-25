@@ -96,13 +96,13 @@ VerificationCredential::VerificationCredential(
 }
 
 bool VerificationCredential::GetVerificationSet(
-    std::shared_ptr<proto::VerificationSet>& verificationSet) const
+    std::unique_ptr<proto::VerificationSet>& verificationSet) const
 {
     if (!data_) {
         return false;
     }
 
-    verificationSet = std::make_shared<proto::VerificationSet>(*data_);
+    verificationSet.reset(new proto::VerificationSet(*data_));
 
     return true;
 }

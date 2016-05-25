@@ -79,7 +79,10 @@
 #include <opentxs/ext/InstantiateContract.hpp>
 
 #include <chrono>
+#include <cstdint>
 #include <memory>
+#include <set>
+#include <string>
 #include <sstream>
 
 namespace opentxs
@@ -894,35 +897,6 @@ std::string OTAPI_Exec::GetContactData(const std::string& NYM_ID) const
     if (!bIsInitialized) {
         otErr << __FUNCTION__
         << ": Not initialized; call OT_API::Init first.\n";
-        return "";
-    }
-    if (NYM_ID.empty()) {
-        otErr << __FUNCTION__ << ": nullptr NYM_ID passed in!\n";
-        return "";
-    }
-    opentxs::Identifier nymID(NYM_ID);
-    OTPasswordData thePWData(OT_PW_DISPLAY);
-    const Nym * pNym =
-        OTAPI()->GetOrLoadNym(nymID, false, __FUNCTION__, &thePWData);
-    if (nullptr == pNym) return "";
-    // ------------------------------
-    auto contactData = OTAPI()->GetContactData(*pNym);
-    // ------------------------------
-    OTData otData = proto::ProtoAsData(*contactData);
-    OTASCIIArmor ascData(otData);
-    // ------------------------------
-    opentxs::String strData;
-    ascData.WriteArmoredString(strData, "CONTACT_DATA");
-    // ------------------------------
-    return strData.Get();
-}
-
-OT_API::ClaimSet OTAPI_Exec::GetClaims(const std::string& NYM_ID) const
-{
-    bool bIsInitialized = OTAPI()->IsInitialized();
-    if (!bIsInitialized) {
-        otErr << __FUNCTION__
-        << ": Not initialized; call OT_API::Init first.\n";
         return {};
     }
     if (NYM_ID.empty()) {
@@ -935,9 +909,9 @@ OT_API::ClaimSet OTAPI_Exec::GetClaims(const std::string& NYM_ID) const
         OTAPI()->GetOrLoadNym(nymID, false, __FUNCTION__, &thePWData);
     if (nullptr == pNym) return {};
     // ------------------------------
-    auto claims = OTAPI()->GetClaims(*pNym);
+    auto claims = App::Me().Identity().Claims(*pNym);
 
-    return claims;
+    return proto::ProtoAsString(*claims);
 }
 
 bool OTAPI_Exec::SetContactData(const std::string& NYM_ID,
@@ -961,24 +935,15 @@ bool OTAPI_Exec::SetContactData(const std::string& NYM_ID,
     Nym* pNym = OTAPI()->GetOrLoadPrivateNym(nymID, false, __FUNCTION__);
     if (nullptr == pNym) return false;
     // ------------------------------
-    opentxs::String strData(THE_DATA);
-    opentxs::OTASCIIArmor ascData;
-
-    if (!ascData.LoadFromString(strData))
-    {
-        otErr << __FUNCTION__ << ": Failed trying to load ContactData from string.\n";
-        return false;
-    }
+    auto contactData = proto::StringToProto<proto::ContactData>(THE_DATA);
     // ------------------------------
-    OTData otData(ascData);
-    proto::ContactData contactData;
-    if (!contactData.ParseFromArray(otData.GetPointer(), otData.GetSize()))
-        return false;
-    // ------------------------------
-    return OTAPI()->SetContactData(*pNym, contactData);
+    return pNym->SetContactData(contactData);
 }
 
-bool OTAPI_Exec::SetClaim(const std::string& nymID, Claim& claim) const
+bool OTAPI_Exec::SetClaim(
+    const std::string& nymID,
+    const std::uint32_t& section,
+    const std::string& claim) const
 {
     bool bIsInitialized = OTAPI()->IsInitialized();
     if (!bIsInitialized) {
@@ -996,12 +961,30 @@ bool OTAPI_Exec::SetClaim(const std::string& nymID, Claim& claim) const
         __FUNCTION__);
     if (nullptr == pNym) return false;
     // ------------------------------
-    return OTAPI()->SetClaim(*pNym, claim);
+    const auto item =
+        proto::DataToProto<proto::ContactItem>(
+            OTData(claim.c_str(), claim.length()));
+    std::set<std::uint32_t> attribute;
+
+    for (const auto& it : item.attribute()) {
+        attribute.insert(it);
+    }
+
+    const Claim input{
+        item.id(),
+        section,
+        item.type(),
+        item.value(),
+        item.start(),
+        item.end(),
+        attribute};
+
+    return App::Me().Identity().AddClaim(*pNym, input);
 }
 
 bool OTAPI_Exec::DeleteClaim(
     const std::string& nymID,
-    std::string& claimID) const
+    const std::string& claimID) const
 {
     bool bIsInitialized = OTAPI()->IsInitialized();
     if (!bIsInitialized) {
@@ -1019,10 +1002,10 @@ bool OTAPI_Exec::DeleteClaim(
         __FUNCTION__);
     if (nullptr == pNym) return false;
     // ------------------------------
-    return OTAPI()->DeleteClaim(*pNym, claimID);
+    return App::Me().Identity().DeleteClaim(*pNym, claimID);
 }
 
-OT_API::VerificationSet OTAPI_Exec::GetVerificationSet(
+std::string OTAPI_Exec::GetVerificationSet(
     const std::string& nymID) const
 {
     bool bIsInitialized = OTAPI()->IsInitialized();
@@ -1035,21 +1018,25 @@ OT_API::VerificationSet OTAPI_Exec::GetVerificationSet(
         otErr << __FUNCTION__ << ": empty nymID passed in!\n";
         return {};
     }
-    const Nym * pNym =
+    const Nym* pNym =
         OTAPI()->GetOrLoadNym(Identifier(nymID), false, __FUNCTION__);
     if (nullptr == pNym) return {};
     // ------------------------------
-    auto verifications = OTAPI()->GetVerificationSet(*pNym);
+    auto verifications = App::Me().Identity().Verifications(*pNym);
 
-    return verifications;
+    if (verifications) {
+        return proto::ProtoAsString(*verifications);
+    }
+
+    return "";
 }
 
-OT_API::VerificationSet OTAPI_Exec::SetVerification(
+std::string OTAPI_Exec::SetVerification(
     bool& changed,
     const std::string& onNym,
     const std::string& claimantNymID,
     const std::string& claimID,
-    const OT_API::ClaimPolarity polarity,
+    const ClaimPolarity polarity,
     const int64_t start,
     const int64_t end) const
 {
@@ -1065,9 +1052,9 @@ OT_API::VerificationSet OTAPI_Exec::SetVerification(
     }
     opentxs::Nym * pNym =
         OTAPI()->GetOrLoadPrivateNym(Identifier(onNym), false, __FUNCTION__);
-    if (nullptr == pNym) return {};
+    if (nullptr == pNym) return "";
     // ------------------------------
-    auto verifications = OTAPI()->SetVerification(
+    auto verifications = App::Me().Identity().Verify(
         *pNym,
         changed,
         claimantNymID,
@@ -1076,7 +1063,11 @@ OT_API::VerificationSet OTAPI_Exec::SetVerification(
         start,
         end);
 
-    return verifications;
+    if (verifications) {
+        return proto::ProtoAsString(*verifications);
+    }
+
+    return "";
 }
 
 std::string OTAPI_Exec::GetSignerNymID(
@@ -16108,4 +16099,43 @@ int32_t OTAPI_Exec::Message_GetTransactionSuccess(
     return OT_FALSE;
 }
 
+std::string OTAPI_Exec::ContactAttributeName(
+    const proto::ContactItemAttribute type,
+    std::string lang)
+{
+    return App::Me().Identity().ContactAttributeName(type, lang);
+}
+
+std::set<proto::ContactSectionName> OTAPI_Exec::ContactSectionList(
+    const std::uint32_t version)
+{
+    return App::Me().Identity().ContactSectionList(version);
+}
+
+std::string OTAPI_Exec::ContactSectionName(
+    const proto::ContactSectionName section,
+    std::string lang)
+{
+    return App::Me().Identity().ContactSectionName(section, lang);
+}
+
+std::set<proto::ContactItemType> OTAPI_Exec::ContactSectionTypeList(
+    const proto::ContactSectionName section,
+    const std::uint32_t version)
+{
+    return App::Me().Identity().ContactSectionTypeList(section, version);
+}
+
+std::string OTAPI_Exec::ContactTypeName(
+    const proto::ContactItemType type,
+    std::string lang)
+{
+    return App::Me().Identity().ContactTypeName(type, lang);
+}
+
+proto::ContactItemType OTAPI_Exec::ReciprocalRelationship(
+    const proto::ContactItemType relationship)
+{
+    return App::Me().Identity().ReciprocalRelationship(relationship);
+}
 } // namespace opentxs

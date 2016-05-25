@@ -452,14 +452,9 @@ public:
     EXPORT static std::string GetNym_ChildCredentialContents(
         const std::string& NYM_ID, const std::string& MASTER_CRED_ID,
         const std::string& SUB_CRED_ID);
-
     EXPORT static bool RevokeChildCredential(const std::string& NYM_ID,
                                            const std::string& MASTER_CRED_ID,
                                            const std::string& SUB_CRED_ID);
-
-    EXPORT static std::string GetContactData(const std::string& NYM_ID);
-    EXPORT static bool SetContactData(const std::string& NYM_ID,
-                                      const std::string& THE_DATA);
     EXPORT std::string NymIDFromPaymentCode(const std::string& paymentCode) const;
 
     /** Creates a contract based on the contents passed in,
@@ -3945,6 +3940,126 @@ public:
     */
     EXPORT static std::string Message_GetNymboxHash(
         const std::string& THE_MESSAGE);
+
+    /**   Obtain the set of contact data associated with the target nym
+     *    \param[in]  nymID the indentifier of the target nym
+     *    \return std::string containing serialized ContactData protobuf
+     *    \note This function returns binary data, not text
+     */
+    EXPORT static std::string GetContactData(const std::string nymID);
+
+    /**   Replace the target nym's contact data with a new set
+     *    \param[in]  nymID the indentifier of the target nym
+     *    \param[in]  data ASCII-armored serialized ContactData protobuf
+     *    \return true for success, false for error
+     *    \warning All existing contact credentials will be revoked, and
+     *             replaced with the supplied data.
+     */
+    EXPORT static bool SetContactData(
+        const std::string nymID,
+        const std::string data);
+
+    /**   Add a single claim to the target nym's contact credential
+     *    \param[in]  nymID the indentifier of the target nym
+     *    \param[in]  section section containing the claim
+     *    \param[in]  claim serialized ContactItem protobuf
+     *    \return true for success, false for error
+     */
+    EXPORT static bool SetClaim(
+        const std::string nymID,
+        const std::uint32_t section,
+        const std::string claim);
+
+    /**   Remove a single claim from the target nym's contact credential
+     *    \param[in]  nymID the indentifier of the target nym
+     *    \param[in]  claimID the indentifier of the target claim
+     *    \return true for success, false for error
+     */
+    EXPORT static bool DeleteClaim(
+        const std::string nymID,
+        const std::string claimID);
+
+    /**  Obtain the set of claim verifications associated with the target nym
+     *    \param[in]  nymID the indentifier of the target nym
+     *    \return std::string containing serialized VerificationSet protobuf
+     *    \note This function returns binary data, not text
+     */
+    EXPORT static std::string GetVerificationSet(
+        const std::string nymID);
+
+    /**   Add a single verification to the target nym's verification credential
+     *    \param[in]  onNym the indentifier of the target nym
+     *    \param[in]  claimantNymID the nym whose claim is being verified
+     *    \param[in]  claimID the identifier of the claim being verified
+     *    \param[in]  polarity type of verification: positive, neutral, negative
+     *    \param[in]  start beginning of the validation interval. defaults to 0
+     *    \param[in]  end end of the validation interval. defaults to 0
+     *    \return std::string containing serialized VerificationSet protobuf
+     *    \note This function returns binary data, not text
+     */
+    EXPORT static std::string SetVerification(
+        const std::string onNym,
+        const std::string claimantNymID,
+        const std::string claimID,
+        const std::uint8_t polarity,
+        const std::int64_t start,
+        const std::int64_t end);
+
+    /**  Translate an claim attribute enum value to human-readable text
+     *    \param[in]  type claim attribute enum value
+     *    \param[in]  lang two letter code for the language to use for the
+     *                     translation
+     *    \return translated attribute name
+     */
+    EXPORT static std::string GetContactAttributeName(
+        const std::uint32_t type,
+        std::string lang);
+
+    /**  Get a list of allowed section types for contact data protobufs of the
+     *   specified version
+     *    \param[in]  version version of the contact data protobuf to query
+     *    \return comma-separated list of allowed section types
+     */
+    EXPORT static std::string GetContactSections(
+        const std::uint32_t version);
+
+    /**  Translate a claim section name enum value to human-readable text
+     *    \param[in]  section claim section name enum value
+     *    \param[in]  lang two letter code for the language to use for the
+     *                     translation
+     *    \return translated claim section
+     */
+    EXPORT static std::string GetContactSectionName(
+        const std::uint32_t section,
+        std::string lang);
+
+    /**  Get a list of allowed claim types for sections of the specified version
+     *    \param[in]  section section name
+     *    \param[in]  version version of the specified section name
+     *    \return comma-separated list of allowed claim types
+     */
+    EXPORT static std::string GetContactSectionTypes(
+        const std::uint32_t section,
+        const std::uint32_t version);
+
+    /**  Translate a claim type enum value to human-readable text
+     *    \param[in]  section claim type enum value
+     *    \param[in]  lang two letter code for the language to use for the
+     *                     translation
+     *    \return translated claim type
+     */
+    EXPORT static std::string GetContactTypeName(
+        const std::uint32_t type,
+        std::string lang);
+
+    /**  Find the relationship type which acts as the inverse of the given value
+     *    \param[in]  relationship claim type enum value for the relationship to
+     *                             be reversed
+     *    \return claim type enum value for the reciprocal relationship, or
+     *            proto::CITEMTYPE_ERROR
+     */
+    EXPORT static std::uint32_t GetReciprocalRelationship(
+        const std::uint32_t relationship);
 
 private:
     OTAPI_Wrap();

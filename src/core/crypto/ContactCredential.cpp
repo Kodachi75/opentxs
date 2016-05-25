@@ -51,20 +51,14 @@
 namespace opentxs
 {
 // static
-Claim ContactCredential::asClaim(
-        const String& nymid,
-        const uint32_t section,
-        const proto::ContactItem& item)
+std::string ContactCredential::ClaimID(
+    const std::string& nymid,
+    const uint32_t section,
+    const proto::ContactItem& item)
 {
-    std::set<uint32_t> attributes;
-
-    for (auto& attrib: item.attribute()) {
-        attributes.insert(attrib);
-    }
-
     proto::Claim preimage;
     preimage.set_version(1);
-    preimage.set_nymid(nymid.Get(), nymid.GetLength());
+    preimage.set_nymid(nymid);
     preimage.set_section(section);
     preimage.set_type(item.type());
     preimage.set_start(item.start());
@@ -76,10 +70,30 @@ Claim ContactCredential::asClaim(
         CryptoHash::HASH160,
         proto::ProtoAsData<proto::Claim>(preimage),
         hash);
-    String ident = App::Me().Crypto().Util().Base58CheckEncode(hash);
 
-    return Claim{ident.Get(), section, item.type(), item.value(),
-        item.start(), item.end(), attributes};
+    return App::Me().Crypto().Util().Base58CheckEncode(hash).Get();
+}
+
+// static
+Claim ContactCredential::asClaim(
+    const String& nymid,
+    const uint32_t section,
+    const proto::ContactItem& item)
+{
+    std::set<uint32_t> attributes;
+
+    for (auto& attrib: item.attribute()) {
+        attributes.insert(attrib);
+    }
+
+    return Claim{
+        ClaimID(nymid.Get(), section, item),
+        section,
+        item.type(),
+        item.value(),
+        item.start(),
+        item.end(),
+        attributes};
 }
 
 ContactCredential::ContactCredential(
@@ -107,13 +121,11 @@ ContactCredential::ContactCredential(
 }
 
 bool ContactCredential::GetContactData(
-        std::shared_ptr<proto::ContactData>& contactData) const
+    std::unique_ptr<proto::ContactData>& contactData) const
 {
-    if (!data_) {
-        return false;
-    }
+    if (!data_) { return false; }
 
-    contactData = std::make_shared<proto::ContactData>(*data_);
+    contactData.reset(new proto::ContactData(*data_));
 
     return bool(contactData);
 }
