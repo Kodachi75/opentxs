@@ -77,6 +77,7 @@
 #include <irrxml/irrXML.hpp>
 
 #include <string>
+#include <list>
 #include <map>
 #include <memory>
 #include <fstream>
@@ -211,6 +212,11 @@ void OTServer::CreateMainFile(
         Log::vError("Error: Failed to create server nym\n");
         OT_FAIL;
     }
+
+    for (auto it : args) {
+        otErr << "Argument: " << it.first << " = " << it.second << std::endl;
+    }
+
     String serverNymID;
     newNym->GetIdentifier(serverNymID);
     newNym.reset();
@@ -243,9 +249,9 @@ void OTServer::CreateMainFile(
     bool notUsed = false;
     App::Me().Config().Set_str("Listen", "bindip", bindIP, notUsed);
 
-    const uint32_t defaultCommandPort = DEFAULT_COMMAND_PORT;
+    const std::uint32_t defaultCommandPort = DEFAULT_COMMAND_PORT;
     const std::string& userCommandPort = args["commandport"];
-    uint32_t commandPort = 0;
+    std::uint32_t commandPort = 0;
     bool needPort = true;
 
     while (needPort) {
@@ -294,7 +300,7 @@ void OTServer::CreateMainFile(
 
     const uint32_t defaultNotificationPort = DEFAULT_NOTIFY_PORT;
 
-    const std::string& userListenNotification = args["listencommand"];
+    const std::string& userListenNotification = args["listennotify"];
     uint32_t listenNotification = 0;
     bool needListenNotification = true;
 
@@ -328,12 +334,33 @@ void OTServer::CreateMainFile(
     if (1 > name.size()) {
         name = defaultName;
     }
+
+    std::list<ServerContract::Endpoint> endpoints;
+    ServerContract::Endpoint ipv4{
+            proto::ADDRESSTYPE_IPV4,
+            proto::PROTOCOLVERSION_LEGACY,
+            hostname,
+            commandPort,
+            1};
+    endpoints.push_back(ipv4);
+
+    const std::string& onion = args["onion"];
+
+    if (0 < onion.size()) {
+        ServerContract::Endpoint tor{
+            proto::ADDRESSTYPE_ONION,
+            proto::PROTOCOLVERSION_LEGACY,
+            onion,
+            commandPort,
+            1};
+        endpoints.push_back(tor);
+    }
+
     auto pContract = App::Me().Contract().Server(
         strNymID,
         name,
         terms,
-        hostname,
-        commandPort);
+        endpoints);
 
     std::string strNotaryID;
     if (pContract) {
@@ -379,6 +406,8 @@ void OTServer::CreateMainFile(
 
     mainFileExists = mainFile_.CreateMainFile(
         strBookended.Get(), strNotaryID, "", strNymID, strCachedKey);
+
+    App::Me().Config().Save();
 }
 
 void OTServer::Init(

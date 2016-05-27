@@ -39,16 +39,18 @@
 #ifndef OPENTXS_CORE_CONTRACT_SERVERCONTRACT_HPP
 #define OPENTXS_CORE_CONTRACT_SERVERCONTRACT_HPP
 
-#include <list>
-#include <memory>
-#include <tuple>
-#include <string>
+#include "opentxs/core/Nym.hpp"
+#include "opentxs/core/Proto.hpp"
+#include "opentxs/core/contract/Signable.hpp"
 
 #include <czmq.h>
 #include <opentxs-proto/verify/VerifyContracts.hpp>
 
-#include "opentxs/core/Nym.hpp"
-#include "opentxs/core/contract/Signable.hpp"
+#include <cstdint>
+#include <list>
+#include <memory>
+#include <string>
+#include <tuple>
 
 namespace opentxs
 {
@@ -58,11 +60,20 @@ class String;
 
 class ServerContract : public Signable
 {
+public:
+    /** A server listen address */
+    typedef std::tuple<
+        proto::AddressType,
+        proto::ProtocolVersion,
+        std::string,    // hostname / address
+        std::uint32_t,  // port
+        std::uint32_t>  // version
+            Endpoint;
+
 private:
     typedef Signable ot_super;
-    typedef std::pair<std::string, uint32_t> ListenParam;
 
-    std::list<ListenParam> listen_params_;
+    std::list<Endpoint> listen_params_;
     std::string name_;
     OTData transport_key_;
 
@@ -79,15 +90,17 @@ private:
 public:
     static ServerContract* Create(
         const ConstNym& nym,
-        const std::string& url,
-        const uint32_t port,
+        const std::list<Endpoint>& endpoints,
         const std::string& terms,
         const std::string& name);
     static ServerContract* Factory(
         const ConstNym& nym,
         const proto::ServerContract& serialized);
 
-    bool ConnectInfo(std::string& strHostname, uint32_t& nPort) const;
+    bool ConnectInfo(
+        std::string& strHostname,
+        uint32_t& nPort,
+        const proto::AddressType& preferred = proto::ADDRESSTYPE_IPV4) const;
     const proto::ServerContract Contract() const;
     const proto::ServerContract PublicContract() const;
     bool Statistics(String& strContents) const;

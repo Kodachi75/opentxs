@@ -286,8 +286,7 @@ ConstServerContract Wallet::Server(
     const std::string& nymid,
     const std::string& name,
     const std::string& terms,
-    const std::string& url,
-    const uint32_t port)
+    const std::list<ServerContract::Endpoint>& endpoints)
 {
     std::string server;
 
@@ -297,10 +296,10 @@ ConstServerContract Wallet::Server(
         std::unique_ptr<ServerContract> contract;
         contract.reset(ServerContract::Create(
             nym,
-            url,
-            port,
+            endpoints,
             terms,
             name));
+
         if (contract) {
 
             return (Server(contract));

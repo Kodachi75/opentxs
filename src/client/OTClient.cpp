@@ -121,16 +121,33 @@ void OTClient::ProcessMessageOut(const ServerContract* pServerContract, Nym* pNy
         m_MessageOutbuffer.AddSentMessage(*(pMsg.release()));
 
     if (!m_pConnection) {
+        bool notUsed = false;
+        std::int64_t preferred;
+        App::Me().Config().CheckSet_long(
+            "Connection",
+            "preferred_address_type",
+            static_cast<std::int64_t>(proto::ADDRESSTYPE_IPV4),
+            preferred,
+            notUsed);
+        App::Me().Config().Save();
+
         uint32_t port = 0;
         std::string hostname;
 
-        if (!pServerContract->ConnectInfo(hostname, port)) {
-            otErr << ": Failed retrieving connection info from server "
-                     "contract.\n";
-            OT_FAIL;
+        if (!pServerContract->ConnectInfo(
+            hostname,
+            port,
+            static_cast<proto::AddressType>(preferred))) {
+                otErr << ": Failed retrieving connection info from server "
+                        "contract.\n";
+                OT_FAIL;
         }
         String endpoint;
         endpoint.Format("tcp://%s:%d", hostname.c_str(), port);
+
+        otErr << "Connecting to server endpoint: " << endpoint.Get()
+              << std::endl;
+
         connect(
             endpoint.Get(),
             pServerContract->PublicTransportKey());

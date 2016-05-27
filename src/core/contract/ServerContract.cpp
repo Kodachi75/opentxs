@@ -62,10 +62,20 @@ ServerContract::ServerContract(
             std::make_shared<proto::Signature>(serialized.signature())));
     version_ = serialized.version();
     conditions_ = serialized.terms();
-    auto listen = serialized.address(0);
-    listen_params_.push_front({listen.host(), std::stoi(listen.port())});
-    name_ = serialized.name();
 
+    for (auto& listen: serialized.address()) {
+        ServerContract::Endpoint endpoint{
+            listen.type(),
+            listen.protocol(),
+            listen.host(),
+            listen.port(),
+            listen.version()};
+        // WARNING: preserve the order of this list, or signature verfication
+        // will fail!
+        listen_params_.push_back(endpoint);
+    }
+
+    name_ = serialized.name();
     transport_key_.Assign(
         serialized.transportkey().c_str(),
         serialized.transportkey().size());
@@ -73,8 +83,7 @@ ServerContract::ServerContract(
 
 ServerContract* ServerContract::Create(
     const ConstNym& nym,
-    const std::string& url,
-    const uint32_t port,
+    const std::list<ServerContract::Endpoint>& endpoints,
     const std::string& terms,
     const std::string& name)
 {
@@ -84,7 +93,7 @@ ServerContract* ServerContract::Create(
 
     if (nullptr != contract) {
         contract->version_ = 1;
-        contract->listen_params_.push_front({url, port});
+        contract->listen_params_ = endpoints;
         contract->conditions_ = terms;
 
         // TODO:: find the right defined constant. 32 is the correct size
@@ -145,14 +154,33 @@ Identifier ServerContract::GetID() const
 
 bool ServerContract::ConnectInfo(
     std::string& strHostname,
-    uint32_t& nPort) const
+    uint32_t& nPort,
+    const proto::AddressType& preferred) const
 {
     if (0 < listen_params_.size()) {
-        ListenParam info = listen_params_.front();
-        strHostname = info.first;
-        nPort = info.second;
+        for (auto& endpoint : listen_params_) {
+            const auto& type = std::get<0>(endpoint);
+            const auto& url = std::get<2>(endpoint);
+            const auto& port = std::get<3>(endpoint);
+
+            if (preferred == type) {
+                strHostname = url;
+                nPort = port;
+
+                return true;
+            }
+        }
+
+        // If we didn't find the preferred type, return the first result
+        const auto& endpoint = listen_params_.front();
+        const auto& url = std::get<2>(endpoint);
+        const auto& port = std::get<3>(endpoint);
+        strHostname = url;
+        nPort = port;
+
         return true;
     }
+
     return false;
 }
 
@@ -173,14 +201,19 @@ proto::ServerContract ServerContract::IDVersion() const
 
     contract.set_name(name_);
 
-    std::string url;
-    uint32_t port = 0;
-    ConnectInfo(url, port);
-    auto addr = contract.add_address();
-    addr->set_version(1);
-    addr->set_type(proto::ADDRESSTYPE_IPV4);
-    addr->set_host(url);
-    addr->set_port(std::to_string(port));
+    for (const auto& endpoint: listen_params_) {
+        auto& addr = *contract.add_address();
+        const auto& version = std::get<4>(endpoint);
+        const auto& type = std::get<0>(endpoint);
+        const auto& protocol = std::get<1>(endpoint);
+        const auto& url = std::get<2>(endpoint);
+        const auto& port = std::get<3>(endpoint);
+        addr.set_version(version);
+        addr.set_type(type);
+        addr.set_protocol(protocol);
+        addr.set_host(url);
+        addr.set_port(port);
+    }
 
     contract.set_terms(conditions_);
     contract.set_transportkey(

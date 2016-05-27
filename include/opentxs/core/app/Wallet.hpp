@@ -40,6 +40,7 @@
 #define OPENTXS_CORE_APP_WALLET_HPP
 
 #include <chrono>
+#include <list>
 #include <map>
 #include <mutex>
 #include <string>
@@ -212,8 +213,7 @@ public:
         const std::string& nymid,
         const std::string& name,
         const std::string& terms,
-        const std::string& url,
-        const uint32_t port);
+        const std::list<ServerContract::Endpoint>& endpoints);
 
     /**   Returns a list of all available server contracts and their aliases
      */
